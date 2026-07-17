@@ -1,0 +1,20 @@
+sequenceDiagram
+    participant Player
+    participant EscapeRoomController
+    participant Inventory
+    participant InteractionResolver
+    participant KeyOnDrawerHandler
+    participant RoomStateController
+    participant DrawerInteractable
+
+    Player->>EscapeRoomController: UseItemOn(rustyKey, drawer)
+    EscapeRoomController->>Inventory: HasItem(rustyKey)
+    Inventory-->>EscapeRoomController: true
+    EscapeRoomController->>InteractionResolver: TryUseItemOnTarget(rustyKey, drawer)
+    InteractionResolver->>KeyOnDrawerHandler: CanHandle(rustyKey, drawer)
+    KeyOnDrawerHandler-->>InteractionResolver: true
+    InteractionResolver->>KeyOnDrawerHandler: Apply(...)
+    KeyOnDrawerHandler->>Inventory: ConsumeItem(rustyKey)
+    KeyOnDrawerHandler->>RoomStateController: SetState(drawer, Open)
+    RoomStateController->>DrawerInteractable: OnStateChanged(Open)
+    DrawerInteractable-->>Player: Drawer opens, note becomes visible

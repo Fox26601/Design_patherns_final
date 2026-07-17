@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb6ac91272ddb41f9b627971d2b0a1c9, type: 3}
+  m_Name: UiTheme
+  m_EditorClassIdentifier: Assembly-CSharp::UI.UiTheme
+  font: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  titleSize: 28
+  bodySize: 18
+  buttonLabelSize: 18
+  buttonHeight: 40
+  panelPadding: 28
+  panelWidth: 460
+  spacing: 14
+  referenceResolution: {x: 1280, y: 720}
+  matchWidthOrHeight: 0.5
+  cardHorizontalMargin: 0.2
+  cardVerticalMargin: 0.18
+  overlayColor: {r: 0.05, g: 0.06, b: 0.09, a: 0.72}
+  panelColor: {r: 0.12, g: 0.14, b: 0.2, a: 0.96}
+  primaryButtonColor: {r: 0.22, g: 0.5, b: 0.95, a: 1}
+  secondaryButtonColor: {r: 0.28, g: 0.32, b: 0.42, a: 1}
+  textColor: {r: 1, g: 1, b: 1, a: 1}
+  mutedTextColor: {r: 0.75, g: 0.78, b: 0.85, a: 1}
+  dropdownBackgroundColor: {r: 0.95, g: 0.96, b: 0.98, a: 1}
+  dropdownTextColor: {r: 0.1, g: 0.12, b: 0.16, a: 1}

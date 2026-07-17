@@ -1,0 +1,77 @@
+classDiagram
+    class ItemDefinition {
+        +string ItemId
+        +string DisplayName
+        +ItemType Type
+        +Sprite Icon
+    }
+
+    class Inventory {
+        -List~string~ collectedItems
+        -HashSet~string~ consumedItems
+        +AddItem(itemId)
+        +ConsumeItem(itemId)
+        +HasItem(itemId) bool
+        +WasConsumed(itemId) bool
+    }
+
+    class IInteractable {
+        <<interface>>
+        +string InteractableId
+        +bool CanInteract(context)
+        +InteractionResult Interact(context)
+    }
+
+    class IItemUsageHandler {
+        <<interface>>
+        +bool CanHandle(sourceId, targetId)
+        +UsageResult Apply(source, target, context)
+    }
+
+    class InteractionResolver {
+        -List~IItemUsageHandler~ handlers
+        +TryUseItemOnTarget(sourceId, targetId, context)
+    }
+
+    class PuzzleDefinition {
+        +string PuzzleId
+        +ICondition[] Prerequisites
+        +IPuzzleAction[] OnSolvedActions
+    }
+
+    class RoomStateController {
+        -Dictionary~string, RoomObjectState~ states
+        +SetState(objectId, newState)
+        +GetState(objectId) RoomObjectState
+    }
+
+    class EscapeRoomController {
+        +Inventory Inventory
+        +InteractionResolver Resolver
+        +RoomStateController RoomState
+        +TryInteract(target)
+        +TryUseItemOn(itemId, targetId)
+    }
+
+    class DrawerInteractable {
+        +Interact(context)
+    }
+
+    class SafeInteractable {
+        +Interact(context)
+    }
+
+    class DoorInteractable {
+        +Interact(context)
+    }
+
+    ItemDefinition <|-- PuzzleDefinition
+    Inventory <-- EscapeRoomController
+    InteractionResolver <-- EscapeRoomController
+    RoomStateController <-- EscapeRoomController
+    IInteractable <|.. DrawerInteractable
+    IInteractable <|.. SafeInteractable
+    IInteractable <|.. DoorInteractable
+    IItemUsageHandler <|.. KeyOnDrawerHandler
+    InteractionResolver o-- IItemUsageHandler
+    EscapeRoomController --> IInteractable

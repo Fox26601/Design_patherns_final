@@ -1,0 +1,95 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 654922c93c8f5420e899ca3f4ff30c14, type: 3}
+  m_Name: EscapeRoomSetup
+  m_EditorClassIdentifier: Assembly-CSharp::Part3_EscapeRoom.EscapeRoomSetupSO
+  RoomId: crimson_mini
+  SafeCode: 7391
+  HintText: 'Click objects to examine or pick them up. Keys 1-6 select inventory slots. Esc / Pause button pauses.'
+  Items:
+  - {fileID: 11400000, guid: e1010101010104010901010101010101, type: 2}
+  - {fileID: 11400000, guid: e2020202020204020902020202020202, type: 2}
+  - {fileID: 11400000, guid: e3030303030304030903030303030303, type: 2}
+  InteractionRules:
+  - {fileID: 11400000, guid: e4040404040404040904040404040404, type: 2}
+  - {fileID: 11400000, guid: e5050505050504050905050505050505, type: 2}
+  SafePuzzle: {fileID: 11400000, guid: e8080808080804080908080808080808, type: 2}
+  InitialStates:
+  - ObjectId: drawer
+    State: 1
+  - ObjectId: note
+    State: 0
+  - ObjectId: safe
+    State: 0
+  - ObjectId: door
+    State: 0
+  Spawns:
+  - ObjectId: rustyKey
+    DisplayLabel: Rusty Key
+    Kind: 0
+    Position: {x: -1.8, y: 0.15, z: -1.2}
+    Scale: {x: 0.3, y: 0.1, z: 0.3}
+    Color: {r: 0.55, g: 0.4, b: 0.2, a: 1}
+    ItemId: rustyKey
+    ExamineText: A rusty key.
+    HideUntilRevealed: 0
+    Primitive: 2
+  - ObjectId: drawer
+    DisplayLabel: Drawer
+    Kind: 1
+    Position: {x: -3.5, y: 1.05, z: 3.2}
+    Scale: {x: 1.2, y: 0.35, z: 0.85}
+    Color: {r: 0.4, g: 0.28, b: 0.18, a: 1}
+    ItemId: 
+    ExamineText: A wooden drawer.
+    HideUntilRevealed: 0
+    Primitive: 3
+  - ObjectId: note
+    DisplayLabel: Note
+    Kind: 2
+    Position: {x: -3.5, y: 1.45, z: 2.95}
+    Scale: {x: 0.55, y: 0.25, z: 0.55}
+    Color: {r: 0.92, g: 0.9, b: 0.75, a: 1}
+    ItemId: 
+    ExamineText: A crumpled note.
+    HideUntilRevealed: 1
+    Primitive: 3
+  - ObjectId: safe
+    DisplayLabel: Safe
+    Kind: 3
+    Position: {x: 3.2, y: 0.75, z: 3.4}
+    Scale: {x: 1.1, y: 1.2, z: 0.9}
+    Color: {r: 0.35, g: 0.38, b: 0.42, a: 1}
+    ItemId: 
+    ExamineText: A metal safe with a keypad.
+    HideUntilRevealed: 0
+    Primitive: 3
+  - ObjectId: door
+    DisplayLabel: Door
+    Kind: 4
+    Position: {x: 0, y: 1.4, z: 5.65}
+    Scale: {x: 1.6, y: 2.6, z: 0.25}
+    Color: {r: 0.45, g: 0.2, b: 0.18, a: 1}
+    ItemId: 
+    ExamineText: The exit door.
+    HideUntilRevealed: 0
+    Primitive: 3
+  - ObjectId: herring
+    DisplayLabel: Red Box (decoy)
+    Kind: 5
+    Position: {x: 2.5, y: 0.35, z: -2.5}
+    Scale: {x: 0.85, y: 0.85, z: 0.85}
+    Color: {r: 0.85, g: 0.08, b: 0.08, a: 1}
+    ItemId: 
+    ExamineText: This red box does nothing. Keep searching.
+    HideUntilRevealed: 0
+    Primitive: 3
