@@ -1,0 +1,20 @@
+sequenceDiagram
+    participant Player
+    participant EscapeRoomController
+    participant PuzzleDefinition
+    participant RoomStateController
+    participant SafeInteractable
+    participant Inventory
+    participant DoorInteractable
+
+    Player->>EscapeRoomController: Interact(safe)
+    EscapeRoomController->>PuzzleDefinition: CheckPrerequisites()
+    PuzzleDefinition-->>EscapeRoomController: drawerOpen AND hasCode
+    EscapeRoomController->>SafeInteractable: Interact(enteredCode)
+    SafeInteractable->>RoomStateController: SetState(safe, Open)
+    RoomStateController-->>Inventory: AddItem(goldKey)
+    Player->>EscapeRoomController: UseItemOn(goldKey, door)
+    EscapeRoomController->>Inventory: ConsumeItem(goldKey)
+    EscapeRoomController->>RoomStateController: SetState(door, Unlocked)
+    RoomStateController->>DoorInteractable: OnStateChanged(Unlocked)
+    DoorInteractable-->>Player: Room escaped
