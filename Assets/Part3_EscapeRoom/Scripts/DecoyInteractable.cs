@@ -12,5 +12,7 @@ namespace Part3_EscapeRoom
             var message = string.IsNullOrWhiteSpace(ExamineText) ? DefaultMessage : ExamineText;
             return new InteractionResult(true, message);
         }
+
+        public override void Accept(IRoomItemVisitor visitor) => visitor.VisitDecoy(this);
     }
 }

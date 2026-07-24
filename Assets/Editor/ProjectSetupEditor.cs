@@ -3,7 +3,6 @@ using System.IO;
 using Core;
 using Part1_TicTacToe;
 using Part2_Adventure;
-using Part4_UnseenPattern;
 using TMPro;
 using UI;
 using UI.Screens;
@@ -33,7 +32,6 @@ namespace EditorTools
             CreateMainMenuScene();
             CreateTicTacToeScene();
             CreateAdventureScene();
-            CreateUnseenDemoScene();
             ConfigureBuildSettings();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -49,7 +47,6 @@ namespace EditorTools
             CreateMainMenuScene();
             CreateTicTacToeScene();
             CreateAdventureScene();
-            CreateUnseenDemoScene();
             ConfigureBuildSettings();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -132,7 +129,7 @@ namespace EditorTools
                     continue;
                 }
 
-                // Batchmode saves can bake scale (0,0,0) into overlay canvases.
+                // Overlay canvases can bake scale (0,0,0) when saved from batch tools.
                 if (rect.localScale.sqrMagnitude < 0.01f)
                 {
                     rect.localScale = Vector3.one;
@@ -165,20 +162,27 @@ namespace EditorTools
             var advHard = GetOrCreateAsset<LevelDefinition>($"{DataPath}/Adventure_Hard.asset");
             SetLevel(advHard, "Hard", 2, 4f, 6, 10, 0);
 
-            var unseenSmall = GetOrCreateAsset<LevelDefinition>($"{DataPath}/Unseen_Small.asset");
-            SetLevel(unseenSmall, "50 Entities", 0, 0f, 0, 0, 50);
-            var unseenLarge = GetOrCreateAsset<LevelDefinition>($"{DataPath}/Unseen_Large.asset");
-            SetLevel(unseenLarge, "200 Entities", 1, 0f, 0, 0, 200);
-
             var tttMode = GetOrCreateAsset<GameModeDefinition>($"{DataPath}/Mode_TicTacToe.asset");
             SetMode(tttMode, "Tic Tac Toe", "TicTacToe", new[] { tttLevel });
             var advMode = GetOrCreateAsset<GameModeDefinition>($"{DataPath}/Mode_Adventure.asset");
             SetMode(advMode, "Adventure", "Adventure", new[] { advEasy, advNormal, advHard });
-            var unseenMode = GetOrCreateAsset<GameModeDefinition>($"{DataPath}/Mode_Unseen.asset");
-            SetMode(unseenMode, "Spatial Partition Demo", "UnseenDemo", new[] { unseenSmall, unseenLarge });
+
+            var modes = new System.Collections.Generic.List<GameModeDefinition> { tttMode, advMode };
+            if (File.Exists($"{ScenesPath}/EscapeRoom.unity"))
+            {
+                var escapePlay = GetOrCreateAsset<LevelDefinition>($"{DataPath}/EscapeRoom_Play.asset");
+                SetLevel(escapePlay, "Crimson Mini Room", 0, 0f, 0, 0, 0);
+                var escapeArch = GetOrCreateAsset<LevelDefinition>($"{DataPath}/EscapeRoom_Architecture.asset");
+                SetLevel(escapeArch, "Architecture Docs", 1, 0f, 0, 0, 0);
+                SetPrivateField(escapeArch, "sceneOverride", "EscapeRoomArchitecture");
+                SetPrivateField(escapeArch, "<SceneOverride>k__BackingField", "EscapeRoomArchitecture");
+                var escapeMode = GetOrCreateAsset<GameModeDefinition>($"{DataPath}/Mode_EscapeRoom.asset");
+                SetMode(escapeMode, "Part 3 — Escape Room", "EscapeRoom", new[] { escapePlay, escapeArch });
+                modes.Add(escapeMode);
+            }
 
             var catalog = GetOrCreateAsset<GameCatalog>($"{DataPath}/GameCatalog.asset");
-            SetCatalog(catalog, new[] { tttMode, advMode, unseenMode });
+            SetCatalog(catalog, modes.ToArray());
             return catalog;
         }
 
@@ -442,36 +446,6 @@ namespace EditorTools
             EditorSceneManager.SaveScene(scene, $"{ScenesPath}/Adventure.unity");
         }
 
-        private static void CreateUnseenDemoScene()
-        {
-            var theme = GetTheme();
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
-
-            var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            plane.transform.localScale = new Vector3(3f, 1f, 3f);
-
-            var canvas = UiFactory.CreateScaledCanvas("UnseenHUD", theme);
-            var status = UiFactory.CreateHudText(
-                canvas.transform,
-                "Status",
-                "Spatial Partition Demo",
-                theme,
-                TextAnchor.UpperLeft,
-                new Vector2(720f, 280f));
-            status.fontSize = theme.BodySize;
-
-            var demoObject = new GameObject("SpatialPartitionDemo");
-            var demo = demoObject.AddComponent<SpatialPartitionDemo>();
-            SetPrivateField(demo, "statusText", status);
-            SetPrivateField(demo, "queryRadius", 8f);
-            SetPrivateField(demo, "cellSize", 4f);
-
-            new GameObject("GamePauseHandler").AddComponent<GamePauseHandler>();
-
-            NormalizeCanvasTransforms();
-            EditorSceneManager.SaveScene(scene, $"{ScenesPath}/UnseenDemo.unity");
-        }
-
         private static GameObject CreateEnemyPrefab()
         {
             const string path = "Assets/Part2_Adventure/Enemy.prefab";
@@ -542,19 +516,27 @@ namespace EditorTools
 
         private static void ConfigureBuildSettings()
         {
-            var scenes = new[]
+            var sceneList = new System.Collections.Generic.List<string>
             {
                 $"{ScenesPath}/Bootstrap.unity",
                 $"{ScenesPath}/MainMenu.unity",
                 $"{ScenesPath}/TicTacToe.unity",
                 $"{ScenesPath}/Adventure.unity",
-                $"{ScenesPath}/UnseenDemo.unity"
             };
-
-            var buildScenes = new EditorBuildSettingsScene[scenes.Length];
-            for (var i = 0; i < scenes.Length; i++)
+            if (File.Exists($"{ScenesPath}/EscapeRoom.unity"))
             {
-                buildScenes[i] = new EditorBuildSettingsScene(scenes[i], true);
+                sceneList.Add($"{ScenesPath}/EscapeRoom.unity");
+            }
+
+            if (File.Exists($"{ScenesPath}/EscapeRoomArchitecture.unity"))
+            {
+                sceneList.Add($"{ScenesPath}/EscapeRoomArchitecture.unity");
+            }
+
+            var buildScenes = new EditorBuildSettingsScene[sceneList.Count];
+            for (var i = 0; i < sceneList.Count; i++)
+            {
+                buildScenes[i] = new EditorBuildSettingsScene(sceneList[i], true);
             }
 
             EditorBuildSettings.scenes = buildScenes;
@@ -600,6 +582,9 @@ namespace EditorTools
 
         private static void SetMode(GameModeDefinition mode, string displayName, string sceneName, LevelDefinition[] levels)
         {
+            SetPrivateField(mode, "displayName", displayName);
+            SetPrivateField(mode, "sceneName", sceneName);
+            SetPrivateField(mode, "levels", levels);
             SetPrivateField(mode, "<DisplayName>k__BackingField", displayName);
             SetPrivateField(mode, "<SceneName>k__BackingField", sceneName);
             SetPrivateField(mode, "<Levels>k__BackingField", levels);
@@ -615,6 +600,12 @@ namespace EditorTools
             int pickupCount,
             int spatialCount)
         {
+            SetPrivateField(level, "displayName", displayName);
+            SetPrivateField(level, "difficultyIndex", difficulty);
+            SetPrivateField(level, "enemySpeed", enemySpeed);
+            SetPrivateField(level, "enemyCount", enemyCount);
+            SetPrivateField(level, "pickupCount", pickupCount);
+            SetPrivateField(level, "spatialEntityCount", spatialCount);
             SetPrivateField(level, "<DisplayName>k__BackingField", displayName);
             SetPrivateField(level, "<DifficultyIndex>k__BackingField", difficulty);
             SetPrivateField(level, "<EnemySpeed>k__BackingField", enemySpeed);
@@ -626,6 +617,7 @@ namespace EditorTools
 
         private static void SetCatalog(GameCatalog catalog, GameModeDefinition[] modes)
         {
+            SetPrivateField(catalog, "modes", modes);
             SetPrivateField(catalog, "<Modes>k__BackingField", modes);
             EditorUtility.SetDirty(catalog);
         }

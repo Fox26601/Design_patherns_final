@@ -8,7 +8,8 @@
 
 **Exported diagrams for submission (PNG):**
 
-- [class_diagram.png](class_diagram.png)
+- [class_diagram.png](class_diagram.png) — full room architecture **including Visitor**
+- [visitor_class_diagram.png](visitor_class_diagram.png) — Visitor class diagram
 - [sequence_item_on_item.png](sequence_item_on_item.png)
 - [sequence_puzzle_door.png](sequence_puzzle_door.png)
 
@@ -37,6 +38,9 @@ Source: `.mmd` files in this folder (regenerate with `npx @mermaid-js/mermaid-cl
 | Room state changes | State + Observer | [State](https://www.unitydesignpatterns.com/patterns/state), [Observer](https://www.unitydesignpatterns.com/patterns/observer) |
 | Item-on-item usage | Strategy / Resolver | [Strategy](https://www.unitydesignpatterns.com/patterns/strategy) |
 | Puzzle prerequisites | Composite conditions | [Composite](https://www.unitydesignpatterns.com/patterns/composite) |
+| Multi-operation on room items | Visitor | [Visitor](https://www.unitydesignpatterns.com/patterns/visitor) |
+
+**Part 4 (Unseen) — Visitor:** used in Crimson Mini Room. **I** / **R** run Inspect / InventoryReport; item+click uses `UseOnTargetVisitor`.
 
 ## Room Content (≥5 object types)
 
@@ -59,84 +63,93 @@ Source: `.mmd` files in this folder (regenerate with `npx @mermaid-js/mermaid-cl
 
 ## Class Diagram
 
+Includes **Visitor** (`IRoomItem` / `IRoomItemVisitor` / Inspect · InventoryReport · UseOnTarget). See also [visitor_class_diagram.png](visitor_class_diagram.png).
+
 ```mermaid
 classDiagram
     class ItemDefinition {
         +string ItemId
         +string DisplayName
         +ItemType Type
-        +Sprite Icon
     }
 
     class Inventory {
-        -List~string~ collectedItems
-        -HashSet~string~ consumedItems
         +AddItem(itemId)
         +ConsumeItem(itemId)
         +HasItem(itemId) bool
-        +WasConsumed(itemId) bool
     }
 
     class IInteractable {
         <<interface>>
-        +string InteractableId
-        +bool CanInteract(context)
-        +InteractionResult Interact(context)
+        +Interact(context)
     }
 
     class IItemUsageHandler {
         <<interface>>
-        +bool CanHandle(sourceId, targetId)
-        +UsageResult Apply(source, target, context)
+        +CanHandle(sourceId, targetId)
+        +Apply(source, target, context)
     }
 
     class InteractionResolver {
-        -List~IItemUsageHandler~ handlers
         +TryUseItemOnTarget(sourceId, targetId, context)
     }
 
-    class PuzzleDefinition {
-        +string PuzzleId
-        +ICondition[] Prerequisites
-        +IPuzzleAction[] OnSolvedActions
-    }
-
     class RoomStateController {
-        -Dictionary~string, RoomObjectState~ states
         +SetState(objectId, newState)
-        +GetState(objectId) RoomObjectState
+        +GetState(objectId)
     }
 
     class EscapeRoomController {
-        +Inventory Inventory
-        +InteractionResolver Resolver
-        +RoomStateController RoomState
         +TryInteract(target)
         +TryUseItemOn(itemId, targetId)
     }
 
-    class DrawerInteractable {
-        +Interact(context)
+    class IRoomItem {
+        <<interface>>
+        +Accept(IRoomItemVisitor)
     }
 
-    class SafeInteractable {
-        +Interact(context)
+    class IRoomItemVisitor {
+        <<interface>>
+        +VisitPickup(PickupInteractable)
+        +VisitNote(NoteInteractable)
+        +VisitDrawer(DrawerInteractable)
+        +VisitDoor(DoorInteractable)
+        +VisitSafe(SafeInteractable)
+        +VisitDecoy(DecoyInteractable)
     }
 
-    class DoorInteractable {
-        +Interact(context)
-    }
+    class InspectVisitor
+    class InventoryReportVisitor
+    class UseOnTargetVisitor
 
-    ItemDefinition <|-- PuzzleDefinition
+    class DrawerInteractable
+    class SafeInteractable
+    class DoorInteractable
+    class PickupInteractable
+    class NoteInteractable
+
     Inventory <-- EscapeRoomController
     InteractionResolver <-- EscapeRoomController
     RoomStateController <-- EscapeRoomController
     IInteractable <|.. DrawerInteractable
     IInteractable <|.. SafeInteractable
     IInteractable <|.. DoorInteractable
+    IInteractable <|.. PickupInteractable
+    IInteractable <|.. NoteInteractable
+    IRoomItem <|.. DrawerInteractable
+    IRoomItem <|.. SafeInteractable
+    IRoomItem <|.. DoorInteractable
+    IRoomItem <|.. PickupInteractable
+    IRoomItem <|.. NoteInteractable
     IItemUsageHandler <|.. KeyOnDrawerHandler
     InteractionResolver o-- IItemUsageHandler
     EscapeRoomController --> IInteractable
+    IRoomItemVisitor <|.. InspectVisitor
+    IRoomItemVisitor <|.. InventoryReportVisitor
+    IRoomItemVisitor <|.. UseOnTargetVisitor
+    IRoomItem --> IRoomItemVisitor : Accept
+    EscapeRoomController --> IRoomItemVisitor : I / R / use
 ```
 
 ## Sequence Diagram — Use Item On Item
@@ -198,3 +211,46 @@ sequenceDiagram
 5. Press Play — `RoomObjectFactory` builds the room from `Spawns`.
 
 New objects of an existing kind are mostly asset work; a brand-new kind needs a factory branch.
+
+## Visitor — operations over room items
+
+Puzzle rules use Strategy/Resolver. Inspect-all, room report, and typed item-use dispatch use **Visitor**.
+
+```mermaid
+classDiagram
+    class IRoomItem {
+        +Accept(IRoomItemVisitor)
+    }
+    class IRoomItemVisitor {
+        +VisitPickup(PickupInteractable)
+        +VisitNote(NoteInteractable)
+        +VisitDrawer(DrawerInteractable)
+        +VisitDoor(DoorInteractable)
+        +VisitSafe(SafeInteractable)
+        +VisitDecoy(DecoyInteractable)
+    }
+    IRoomItem <|.. PickupInteractable
+    IRoomItem <|.. NoteInteractable
+    IRoomItem <|.. DrawerInteractable
+    IRoomItem <|.. DoorInteractable
+    IRoomItem <|.. SafeInteractable
+    IRoomItem <|.. DecoyInteractable
+    IRoomItemVisitor <|.. InspectVisitor
+    IRoomItemVisitor <|.. InventoryReportVisitor
+    IRoomItemVisitor <|.. UseOnTargetVisitor
+    IRoomItem --> IRoomItemVisitor : Accept
+```
+
+### Adding a new operation
+
+1. Implement a new `IRoomItemVisitor`.
+2. Handle each `Visit*` method for the existing item types.
+3. Invoke it from `EscapeRoomGameController` (same idea as **I** / **R**).
+
+Adding a new item type means extending the visitor interface and every visitor implementation.
+
+### In play
+
+- Part 3 → **Crimson Mini Room**
+- **I** Inspect all · **R** Room report · inventory + click = Use via Visitor
+- Code: `Assets/Part3_EscapeRoom/Scripts/`

@@ -30,3 +30,6 @@ sysinfo.txt
 *.unitypackage
 *.app
 crashlytics-build.properties
+
+*.log
+visitor_rebuild.log

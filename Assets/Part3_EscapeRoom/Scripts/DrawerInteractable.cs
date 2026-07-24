@@ -12,5 +12,7 @@ namespace Part3_EscapeRoom
 
             return new InteractionResult(true, "The drawer is locked. It needs a key.");
         }
+
+        public override void Accept(IRoomItemVisitor visitor) => visitor.VisitDrawer(this);
     }
 }

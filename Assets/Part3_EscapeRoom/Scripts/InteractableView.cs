@@ -5,7 +5,7 @@ namespace Part3_EscapeRoom
     /// <summary>
     /// World object view that reacts to RoomState changes (Observer).
     /// </summary>
-    public class InteractableView : MonoBehaviour, IInteractable
+    public class InteractableView : MonoBehaviour, IInteractable, IRoomItem
     {
         [SerializeField] private string interactableId;
         [SerializeField] private string examineText = "Nothing special.";
@@ -80,6 +80,11 @@ namespace Part3_EscapeRoom
         public virtual InteractionResult Interact(InteractionContext context)
         {
             return new InteractionResult(true, examineText);
+        }
+
+        public virtual void Accept(IRoomItemVisitor visitor)
+        {
+            // Concrete subclasses override with typed Visit* calls.
         }
 
         private void HandleStateChanged(string objectId, RoomObjectState newState)

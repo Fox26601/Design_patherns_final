@@ -1,0 +1,22 @@
+classDiagram
+    class IRoomItem {
+        +Accept(IRoomItemVisitor)
+    }
+    class IRoomItemVisitor {
+        +VisitPickup(PickupInteractable)
+        +VisitNote(NoteInteractable)
+        +VisitDrawer(DrawerInteractable)
+        +VisitDoor(DoorInteractable)
+        +VisitSafe(SafeInteractable)
+        +VisitDecoy(DecoyInteractable)
+    }
+    IRoomItem <|.. PickupInteractable
+    IRoomItem <|.. NoteInteractable
+    IRoomItem <|.. DrawerInteractable
+    IRoomItem <|.. DoorInteractable
+    IRoomItem <|.. SafeInteractable
+    IRoomItem <|.. DecoyInteractable
+    IRoomItemVisitor <|.. InspectVisitor
+    IRoomItemVisitor <|.. InventoryReportVisitor
+    IRoomItemVisitor <|.. UseOnTargetVisitor
+    IRoomItem --> IRoomItemVisitor : Accept

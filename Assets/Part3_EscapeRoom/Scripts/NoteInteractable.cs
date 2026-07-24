@@ -19,5 +19,7 @@ namespace Part3_EscapeRoom
                 ? context.Controller.ReadNote()
                 : new InteractionResult(true, "The note is blank.");
         }
+
+        public override void Accept(IRoomItemVisitor visitor) => visitor.VisitNote(this);
     }
 }
