@@ -33,5 +33,7 @@ namespace Part3_EscapeRoom
                 ? $"You picked up {display}."
                 : pickupMessage);
         }
+
+        public override void Accept(IRoomItemVisitor visitor) => visitor.VisitPickup(this);
     }
 }

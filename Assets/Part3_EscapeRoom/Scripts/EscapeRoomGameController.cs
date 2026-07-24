@@ -65,8 +65,8 @@ namespace Part3_EscapeRoom
             if (hintText != null)
             {
                 hintText.text = setup != null
-                    ? setup.HintText
-                    : "Click objects. Keys 1-6 select inventory slots. Esc pauses.";
+                    ? $"{setup.HintText}\nI = inspect all | R = room report | item+click = use."
+                    : "Click objects. Keys 1-6 select inventory. I/R = reports. Esc pauses.";
                 hintText.raycastTarget = false;
             }
 
@@ -301,6 +301,21 @@ namespace Part3_EscapeRoom
 
             inventoryUI?.HandleHotkeys();
 
+            if (Keyboard.current != null &&
+                (Keyboard.current.rKey.wasPressedThisFrame || Keyboard.current.iKey.wasPressedThisFrame))
+            {
+                if (Keyboard.current.iKey.wasPressedThisFrame)
+                {
+                    RunInspectAllVisitor();
+                }
+                else
+                {
+                    RunInventoryReportVisitor();
+                }
+
+                return;
+            }
+
             if (Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame)
             {
                 return;
@@ -331,7 +346,9 @@ namespace Part3_EscapeRoom
             var selected = inventoryUI != null ? inventoryUI.SelectedItemId : null;
             if (!string.IsNullOrEmpty(selected))
             {
-                var usage = _controller.TryUseItemOn(selected, view);
+                var useVisitor = new UseOnTargetVisitor(_controller, selected);
+                view.Accept(useVisitor);
+                var usage = useVisitor.Result;
                 if (usage.Success)
                 {
                     messageLog?.AddMessage(usage.Message);
@@ -385,6 +402,44 @@ namespace Part3_EscapeRoom
             }
 
             inventoryUI?.Refresh();
+        }
+
+        private void RunInventoryReportVisitor()
+        {
+            if (_controller == null)
+            {
+                return;
+            }
+
+            var report = new InventoryReportVisitor(_controller);
+            AcceptAllRoomItems(report);
+            messageLog?.AddMessage(report.Result);
+            examinePanel?.Show(report.Result);
+        }
+
+        private void RunInspectAllVisitor()
+        {
+            if (_controller == null)
+            {
+                return;
+            }
+
+            var inspect = new InspectVisitor(_controller);
+            AcceptAllRoomItems(inspect);
+            messageLog?.AddMessage(inspect.Result);
+            examinePanel?.Show(inspect.Result);
+        }
+
+        private static void AcceptAllRoomItems(IRoomItemVisitor visitor)
+        {
+            var views = FindObjectsByType<InteractableView>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (var view in views)
+            {
+                if (view != null)
+                {
+                    view.Accept(visitor);
+                }
+            }
         }
 
         private InteractableView RaycastBestInteractable(Ray ray)

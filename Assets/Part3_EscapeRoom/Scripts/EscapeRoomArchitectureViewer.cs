@@ -135,8 +135,25 @@ namespace Part3_EscapeRoom
             CreateTextBlock(
                 content,
                 "Assignment note",
-                "Playable escape room: Part 3 → Crimson Mini Room.\n" +
-                "This screen shows the architecture diagrams for submission.");
+                "Playable scene: Part 3 → Crimson Mini Room.\n" +
+                "This screen shows architecture diagrams for submission.\n" +
+                "Visitor (Unseen pattern) is used in Crimson Mini Room (I / R / item use).");
+
+            CreateTextBlock(
+                content,
+                "Patterns",
+                "Visitor · State + Observer · Strategy · Composite · ScriptableObject · Factory");
+
+            CreateTextBlock(
+                content,
+                "Visitor",
+                "IRoomItem.Accept(IRoomItemVisitor) on Pickup / Note / Drawer / Door / Safe / Decoy.\n" +
+                "• InspectVisitor — I (inspect all)\n" +
+                "• InventoryReportVisitor — R (room report)\n" +
+                "• UseOnTargetVisitor — inventory item + click target\n\n" +
+                "Play: Part 3 Escape Room → Crimson Mini Room.");
+
+            AddDiagram(content, "Class Diagram — Visitor", "visitor_class_diagram");
 
             CreateTextBlock(
                 content,
@@ -148,11 +165,6 @@ namespace Part3_EscapeRoom
                 "3) Enter code on Safe → Gold Key\n" +
                 "4) Use Gold Key on Door → escape");
 
-            CreateTextBlock(
-                content,
-                "Patterns",
-                "State + Observer · Strategy · Composite · ScriptableObject data · Factory (Spawns)");
-
             AddDiagram(content, "Class Diagram", "class_diagram");
             AddDiagram(content, "Sequence — Use Item On Item", "sequence_item_on_item");
             AddDiagram(content, "Sequence — Solve Puzzle / Open Door", "sequence_puzzle_door");
@@ -163,7 +175,8 @@ namespace Part3_EscapeRoom
                 "1) Add a RoomObjectSpawn on EscapeRoomSetup (and ItemDefinition if it is a pickup)\n" +
                 "2) Add or reorder InteractionRuleSO (source to target + actions)\n" +
                 "3) Update PuzzleDefinition prerequisites / code if needed\n" +
-                "4) Press Play\n\n" +
+                "4) For a new report-style operation, add an IRoomItemVisitor\n" +
+                "5) Press Play\n\n" +
                 "Inventory slots show found items; Used shows consumed items.\n\n" +
                 "Details: Docs/Part3_EscapeRoom/Architecture.md");
 
@@ -202,8 +215,8 @@ namespace Part3_EscapeRoom
 
             var imageObject = CreateRect(title + "Image", parent, withImage: true);
             var layout = imageObject.gameObject.AddComponent<LayoutElement>();
-            layout.preferredHeight = 420f;
-            layout.minHeight = 420f;
+            layout.preferredHeight = 480f;
+            layout.minHeight = 480f;
             layout.flexibleWidth = 1f;
             layout.flexibleHeight = 0f;
 
@@ -247,7 +260,7 @@ namespace Part3_EscapeRoom
             var lineCount = string.IsNullOrEmpty(body) ? 0 : body.Split('\n').Length;
             var bodyHeight = string.IsNullOrEmpty(body)
                 ? 0f
-                : Mathf.Clamp(24f + lineCount * 20f, 40f, 240f);
+                : Mathf.Clamp(24f + lineCount * 20f, 40f, 400f);
             var blockHeight = 26f + (string.IsNullOrEmpty(body) ? 0f : 4f + bodyHeight);
 
             var block = CreateRect(title + "Block", parent, withImage: false);

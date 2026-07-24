@@ -1,29 +1,28 @@
 # Design Patterns Games
 
-Unity 6 (6000.3 LTS) project for a software architecture assignment focused on **Design Patterns** and **OOP**.
+Unity 6 (6000.3 LTS) project for a software architecture course on **Design Patterns** and **OOP**.
 
 Reference: [unitydesignpatterns.com](https://www.unitydesignpatterns.com)
 
-## How To Run (important)
+## How To Run
 
-1. Open this project in **Unity 6000.3 LTS**.
-2. Open **`Assets/Scenes/Bootstrap.unity`** (do not start from game scenes alone).
+1. Open the project in **Unity 6000.3 LTS**.
+2. Open **`Assets/Scenes/Bootstrap.unity`**.
 3. Press **Play**.
-4. Choose a mode in the dropdown → **Play** → pick a level.
+4. Choose a mode → **Play** → select a level.
 5. **Esc** opens pause (Resume / Restart / Main Menu).
 
-If UI/scenes look wrong: menu **DesignPatterns → Rebuild UI**, then **Reload** when Unity asks, then Play again from `Bootstrap`.
+If the UI looks wrong: **DesignPatterns → Rebuild UI**, reload when prompted, then Play from `Bootstrap` again.
 
-## What You Get (3 playable modes + architecture doc)
+## Modes
 
-| Mode | Scene | What to demo |
-|------|-------|--------------|
+| Mode | Scene | Demo |
+|------|-------|------|
 | Tic Tac Toe | `TicTacToe` | Local 2P, score, Undo/Redo, Restart |
-| Adventure | `Adventure` | WASD, avoid red enemies, collect yellow pickups, score + minimap |
-| Spatial Partition | `UnseenDemo` | WASD move, green = nearby, **T** toggles brute force vs grid timing |
-| Escape Room | docs only | Class + sequence diagrams (not a playable scene) |
+| Adventure | `Adventure` | WASD, enemies, yellow pickups, score HUD, minimap |
+| Escape Room | `EscapeRoom` / `EscapeRoomArchitecture` | Crimson Mini Room + architecture docs |
 
-## Patterns Map
+## Patterns
 
 ### Part 1 — Tic Tac Toe
 
@@ -33,61 +32,59 @@ If UI/scenes look wrong: menu **DesignPatterns → Rebuild UI**, then **Reload**
 | UI vs rules | MVP | `BoardModel`, `BoardView`, `GamePresenter` |
 | Undo / Redo | Command | `PlaceMarkCommand`, `CommandHistory` |
 
-**Why Command (not Memento):** each move is one cell place/clear. Memento would snapshot the whole board every turn for no gain here.
+Command fits better than Memento here: each undo step is one cell place/clear.
 
 ### Part 2 — Adventure
 
 | Feature | Pattern | Code |
 |---------|---------|------|
 | Pickup notify | Observer | `PickupEventChannel` |
-| Score (not Singleton) | ScriptableObject service | `ScoreService` |
-| HUD + minimap | Observers | `ScoreView`, `MinimapController` |
+| Score | ScriptableObject service | `ScoreService` |
+| HUD + minimap | Observer | `ScoreView`, `MinimapController` |
 
-Controls: **WASD**. Yellow cylinders = pickups. Red cubes chase you. Catch = Game Over.
+Controls: **WASD**. Yellow pickups raise score. Red enemies chase; contact ends the run.
 
-### Part 3 — Escape Room (architecture only)
+### Part 3 — Escape Room / Part 4 — Visitor
 
-See [Docs/Part3_EscapeRoom/Architecture.md](Docs/Part3_EscapeRoom/Architecture.md):
-
-- Class diagram
-- Sequence: use item on item
-- Sequence: solve puzzle / open door
-- How to add a new item without breaking the core
-
-Upload that document to Google Drive for submission.
-
-### Part 4 — Unseen: Spatial Partition
+Playable room and docs: [Architecture.md](Docs/Part3_EscapeRoom/Architecture.md), [Walkthrough.md](Docs/Part3_EscapeRoom/Walkthrough.md).
 
 | Feature | Pattern | Code |
 |---------|---------|------|
-| Fast proximity query | Spatial Partition | `SpatialGrid`, `SpatialPartitionDemo` |
+| Room state / views | State + Observer | `RoomStateController`, `InteractableView` |
+| Item-on-item rules | Strategy | `InteractionResolver`, `InteractionRuleSO` |
+| Puzzle prerequisites | Composite | `PuzzleDefinition`, conditions |
+| Spawns / config | Factory + ScriptableObject | `RoomObjectFactory`, `EscapeRoomSetupSO` |
+| Inspect / report / use on items | Visitor | `IRoomItem`, `InspectVisitor`, `InventoryReportVisitor`, `UseOnTargetVisitor` |
 
-Controls: **WASD** move query center; **T** toggle Spatial Partition vs Brute Force; compare **ms** on HUD. Nearby cubes turn green.
+In Crimson Mini Room: **I** inspect all, **R** room report, inventory slot + click target applies use through Visitor.
+
+Upload the architecture diagrams / `Architecture.md` to Google Drive for submission.
 
 ## Project Structure
 
 ```
 Assets/
-  _Shared/            Singleton, EventChannel, ServiceLocator
-  Core/               GameFlow, SceneLoader, ScreenManager, catalog SO
-  UI/                 Theme, Factory, menus
+  _Shared/
+  Core/
+  UI/
   Part1_TicTacToe/
   Part2_Adventure/
-  Part4_UnseenPattern/
-  Scenes/             Bootstrap + game scenes
+  Part3_EscapeRoom/
+  Scenes/
 Docs/Part3_EscapeRoom/
 ```
 
-## Video Demo Checklist
+## Video Checklist
 
-1. Bootstrap → dropdown → each mode → level select
-2. Tic Tac Toe: place marks, Undo, Redo, win/draw, Restart
-3. Adventure: move, collect pickup (score up, yellow marker gone), get caught → Game Over
-4. Spatial: move into a cluster, nearby green, press T and show query time change
-5. Esc pause in any game → Resume / Main Menu
+1. Bootstrap → each mode → level select
+2. Tic Tac Toe: marks, Undo, Redo, win/draw, Restart
+3. Adventure: move, collect pickup, Game Over on catch
+4. Escape Room → Architecture Docs (Visitor on the diagrams)
+5. Crimson Mini Room: **I** / **R**, then key on drawer/door
+6. Esc → Resume / Main Menu
 
-## Submission Checklist
+## Submission
 
 - [ ] Public GitHub repo
-- [ ] Screen recording of the checklist above
-- [ ] Escape Room diagrams on Drive (from `Architecture.md`)
+- [ ] Screen recording of the checklist
+- [ ] Escape Room diagrams on Drive

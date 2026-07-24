@@ -8,6 +8,8 @@ Escape the locked crimson room by collecting items, combining them, and opening 
 
 - **Left click** — examine / pick up / interact
 - **Inventory** — click a slot, or press **1–6**, then click a target to use the item
+- **I** — inspect-all report (Visitor)
+- **R** — room report (Visitor)
 - Click / press the same slot again to deselect
 - **Esc** — pause
 
@@ -28,3 +30,5 @@ The red cube is a decoy. It prints: `This red box does nothing. Keep searching.`
 ## Architecture docs
 
 From the main menu: **Part 3 — Escape Room** → **Architecture Docs**.
+
+That screen shows the class/sequence diagrams and the Visitor section used in Crimson Mini Room.

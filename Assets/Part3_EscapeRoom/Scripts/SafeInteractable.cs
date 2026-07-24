@@ -27,5 +27,7 @@ namespace Part3_EscapeRoom
             OnCodeInputRequested?.Invoke();
             return new InteractionResult(true, "Enter the code.");
         }
+
+        public override void Accept(IRoomItemVisitor visitor) => visitor.VisitSafe(this);
     }
 }

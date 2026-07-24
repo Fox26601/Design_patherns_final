@@ -13,5 +13,7 @@ namespace Part3_EscapeRoom
 
             return new InteractionResult(true, "The door is locked. It needs a special key.");
         }
+
+        public override void Accept(IRoomItemVisitor visitor) => visitor.VisitDoor(this);
     }
 }
