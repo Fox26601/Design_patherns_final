@@ -15,6 +15,7 @@ namespace UI
         {
             "TicTacToe",
             "Adventure",
+            "UnseenDemo",
             "EscapeRoom"
         };
 

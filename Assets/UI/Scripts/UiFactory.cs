@@ -5,7 +5,7 @@ using UnityEngine.UI;
 namespace UI
 {
     /// <summary>
-    /// Builds readable UI elements from UiTheme (no absolute pixel hacks).
+    /// Builds adaptive UI from UiTheme using stretch anchors and layout groups.
     /// </summary>
     public static class UiFactory
     {
@@ -23,6 +23,10 @@ namespace UI
             scaler.matchWidthOrHeight = theme.MatchWidthOrHeight;
 
             canvasObject.AddComponent<GraphicRaycaster>();
+            canvasObject.AddComponent<AdaptiveCanvasGuard>();
+
+            var rect = canvasObject.GetComponent<RectTransform>();
+            rect.localScale = Vector3.one;
             return canvasObject;
         }
 
@@ -36,6 +40,9 @@ namespace UI
             return overlay;
         }
 
+        /// <summary>
+        /// Screen-relative card: stretches with margins so it stays large on any aspect.
+        /// </summary>
         public static GameObject CreateMenuCard(Transform parent, string name, UiTheme theme)
         {
             var card = new GameObject(name);
@@ -44,10 +51,13 @@ namespace UI
             image.color = theme.PanelColor;
 
             var rect = card.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            var h = Mathf.Clamp01(theme.CardHorizontalMargin);
+            var v = Mathf.Clamp01(theme.CardVerticalMargin);
+            rect.anchorMin = new Vector2(h, v);
+            rect.anchorMax = new Vector2(1f - h, 1f - v);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(theme.PanelWidth, 480f);
 
             var layout = card.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(
@@ -56,17 +66,24 @@ namespace UI
                 (int)theme.PanelPadding,
                 (int)theme.PanelPadding);
             layout.spacing = theme.Spacing;
-            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.childAlignment = TextAnchor.MiddleCenter;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
-            var fitter = card.AddComponent<ContentSizeFitter>();
-            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
             return card;
+        }
+
+        public static GameObject CreateFlexibleSpacer(Transform parent, float flexibleHeight = 1f)
+        {
+            var spacer = new GameObject("Spacer");
+            spacer.transform.SetParent(parent, false);
+            var layout = spacer.AddComponent<LayoutElement>();
+            layout.flexibleHeight = flexibleHeight;
+            layout.flexibleWidth = 1f;
+            layout.minHeight = 0f;
+            return spacer;
         }
 
         public static TMP_Text CreateText(
@@ -76,7 +93,8 @@ namespace UI
             float fontSize,
             UiTheme theme,
             Color? color = null,
-            TextAlignmentOptions alignment = TextAlignmentOptions.Center)
+            TextAlignmentOptions alignment = TextAlignmentOptions.Center,
+            bool addLayoutElement = true)
         {
             var textObject = new GameObject(name);
             textObject.transform.SetParent(parent, false);
@@ -92,10 +110,15 @@ namespace UI
             tmp.alignment = alignment;
             tmp.color = color ?? theme.TextColor;
             tmp.raycastTarget = false;
+            tmp.overflowMode = TextOverflowModes.Overflow;
 
-            var layout = textObject.AddComponent<LayoutElement>();
-            layout.minHeight = fontSize + 12f;
-            layout.preferredHeight = fontSize + 16f;
+            if (addLayoutElement)
+            {
+                var layout = textObject.AddComponent<LayoutElement>();
+                layout.minHeight = fontSize * 1.35f;
+                layout.preferredHeight = fontSize * 1.5f;
+                layout.flexibleWidth = 1f;
+            }
 
             return tmp;
         }
@@ -125,10 +148,11 @@ namespace UI
                 label,
                 theme.ButtonLabelSize,
                 theme,
-                theme.TextColor);
+                theme.TextColor,
+                TextAlignmentOptions.Center,
+                addLayoutElement: false);
             StretchFull(text.rectTransform);
             text.raycastTarget = false;
-            Object.DestroyImmediate(text.GetComponent<LayoutElement>());
 
             return button;
         }
@@ -158,9 +182,10 @@ namespace UI
             label.enableAutoSizing = false;
             label.color = theme.DropdownTextColor;
             label.alignment = TextAlignmentOptions.MidlineLeft;
+            label.overflowMode = TextOverflowModes.Ellipsis;
             StretchFull(label.rectTransform);
-            label.rectTransform.offsetMin = new Vector2(16f, 0f);
-            label.rectTransform.offsetMax = new Vector2(-40f, 0f);
+            label.rectTransform.offsetMin = new Vector2(24f, 8f);
+            label.rectTransform.offsetMax = new Vector2(-56f, -8f);
 
             var arrowObject = new GameObject("Arrow");
             arrowObject.transform.SetParent(dropdownObject.transform, false);
@@ -171,16 +196,16 @@ namespace UI
             }
 
             arrow.text = "▼";
-            arrow.fontSize = 18f;
+            arrow.fontSize = theme.ButtonLabelSize * 0.7f;
             arrow.color = theme.DropdownTextColor;
             arrow.alignment = TextAlignmentOptions.Center;
             arrow.raycastTarget = false;
             var arrowRect = arrow.rectTransform;
-            arrowRect.anchorMin = new Vector2(1f, 0.5f);
-            arrowRect.anchorMax = new Vector2(1f, 0.5f);
+            arrowRect.anchorMin = new Vector2(1f, 0f);
+            arrowRect.anchorMax = new Vector2(1f, 1f);
             arrowRect.pivot = new Vector2(1f, 0.5f);
-            arrowRect.sizeDelta = new Vector2(36f, 36f);
-            arrowRect.anchoredPosition = new Vector2(-8f, 0f);
+            arrowRect.offsetMin = new Vector2(-52f, 0f);
+            arrowRect.offsetMax = new Vector2(-8f, 0f);
 
             var template = new GameObject("Template");
             template.transform.SetParent(dropdownObject.transform, false);
@@ -191,7 +216,7 @@ namespace UI
             templateRect.anchorMin = new Vector2(0f, 0f);
             templateRect.anchorMax = new Vector2(1f, 0f);
             templateRect.pivot = new Vector2(0.5f, 1f);
-            templateRect.sizeDelta = new Vector2(0f, 200f);
+            templateRect.sizeDelta = new Vector2(0f, theme.ButtonHeight * 4.5f);
             templateRect.anchoredPosition = Vector2.zero;
 
             var scroll = template.AddComponent<ScrollRect>();
@@ -217,7 +242,7 @@ namespace UI
             var itemRect = item.GetComponent<RectTransform>();
             itemRect.anchorMin = new Vector2(0f, 0.5f);
             itemRect.anchorMax = new Vector2(1f, 0.5f);
-            itemRect.sizeDelta = new Vector2(0f, 48f);
+            itemRect.sizeDelta = new Vector2(0f, theme.ButtonHeight);
 
             var itemBg = item.AddComponent<Image>();
             itemBg.color = theme.DropdownBackgroundColor;
@@ -236,8 +261,8 @@ namespace UI
             itemLabel.color = theme.DropdownTextColor;
             itemLabel.alignment = TextAlignmentOptions.MidlineLeft;
             StretchFull(itemLabel.rectTransform);
-            itemLabel.rectTransform.offsetMin = new Vector2(16f, 0f);
-            itemLabel.rectTransform.offsetMax = new Vector2(-16f, 0f);
+            itemLabel.rectTransform.offsetMin = new Vector2(24f, 0f);
+            itemLabel.rectTransform.offsetMax = new Vector2(-24f, 0f);
 
             scroll.content = contentRect;
             scroll.viewport = viewportRect;
@@ -264,10 +289,11 @@ namespace UI
             layout.childForceExpandHeight = false;
             var layoutElement = stack.AddComponent<LayoutElement>();
             layoutElement.flexibleWidth = 1f;
+            layoutElement.flexibleHeight = 1f;
             return stack;
         }
 
-        public static GameObject CreateHorizontalStack(Transform parent, string name, float spacing)
+        public static GameObject CreateHorizontalStack(Transform parent, string name, float spacing, float height)
         {
             var stack = new GameObject(name);
             stack.transform.SetParent(parent, false);
@@ -279,10 +305,15 @@ namespace UI
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = true;
             var layoutElement = stack.AddComponent<LayoutElement>();
-            layoutElement.minHeight = 56f;
-            layoutElement.preferredHeight = 56f;
+            layoutElement.minHeight = height;
+            layoutElement.preferredHeight = height;
             layoutElement.flexibleWidth = 1f;
             return stack;
+        }
+
+        public static GameObject CreateHorizontalStack(Transform parent, string name, float spacing)
+        {
+            return CreateHorizontalStack(parent, name, spacing, 80f);
         }
 
         public static TMP_Text CreateHudText(
@@ -293,10 +324,16 @@ namespace UI
             TextAnchor corner,
             Vector2 size)
         {
-            var label = CreateText(parent, name, text, theme.BodySize + 4f, theme, theme.TextColor, TextAlignmentOptions.TopLeft);
-            Object.DestroyImmediate(label.GetComponent<LayoutElement>());
-            var rect = label.rectTransform;
-            ApplyCorner(rect, corner, size, new Vector2(24f, 24f));
+            var label = CreateText(
+                parent,
+                name,
+                text,
+                theme.BodySize,
+                theme,
+                theme.TextColor,
+                TextAlignmentOptions.TopLeft,
+                addLayoutElement: false);
+            ApplyCorner(label.rectTransform, corner, size, new Vector2(32f, 32f));
             return label;
         }
 

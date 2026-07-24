@@ -3,15 +3,15 @@ using System.IO;
 using Core;
 using Part1_TicTacToe;
 using Part2_Adventure;
-using Part3_EscapeRoom;
+using Part4_UnseenPattern;
 using TMPro;
+using UI;
 using UI.Screens;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace EditorTools
@@ -20,23 +20,78 @@ namespace EditorTools
     {
         private const string ScenesPath = "Assets/Scenes";
         private const string DataPath = "Assets/Core/Data";
+        private const string ThemePath = "Assets/UI/Data/UiTheme.asset";
+        private const string TmpFontPath = "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset";
 
         [MenuItem("DesignPatterns/Setup Project")]
         public static void SetupProject()
         {
             EnsureFolders();
-            var catalog = CreateDataAssets();
+            CreateOrUpdateTheme();
+            CreateDataAssets();
             CreateBootstrapScene();
             CreateMainMenuScene();
             CreateTicTacToeScene();
             CreateAdventureScene();
-            CreateEscapeRoomScene();
-            CreateEscapeRoomArchitectureScene();
+            CreateUnseenDemoScene();
             ConfigureBuildSettings();
-            ConfigureEscapeRoomDiagramSprites();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("Design Patterns project setup complete.");
+        }
+
+        [MenuItem("DesignPatterns/Rebuild UI")]
+        public static void RebuildUi()
+        {
+            EnsureFolders();
+            CreateOrUpdateTheme();
+            CreateBootstrapScene();
+            CreateMainMenuScene();
+            CreateTicTacToeScene();
+            CreateAdventureScene();
+            CreateUnseenDemoScene();
+            ConfigureBuildSettings();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("UI rebuilt with UiTheme + UiFactory. Open Bootstrap and press Play.");
+        }
+
+        [MenuItem("DesignPatterns/Fix Missing Cameras")]
+        public static void FixMissingCameras()
+        {
+            EnsureCameraInScene($"{ScenesPath}/MainMenu.unity", solidColor: true);
+            EnsureCameraInScene($"{ScenesPath}/Bootstrap.unity", solidColor: true);
+            EnsureCameraInScene($"{ScenesPath}/TicTacToe.unity", solidColor: true);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("Cameras ensured in MainMenu, Bootstrap, TicTacToe.");
+        }
+
+        private static void EnsureCameraInScene(string scenePath, bool solidColor)
+        {
+            var scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            if (Object.FindFirstObjectByType<Camera>() == null)
+            {
+                CreateSceneCamera(solidColor);
+                EditorSceneManager.SaveScene(scene);
+            }
+        }
+
+        private static void CreateSceneCamera(bool solidColor)
+        {
+            var cameraObject = new GameObject("Main Camera");
+            cameraObject.tag = "MainCamera";
+            var camera = cameraObject.AddComponent<Camera>();
+            cameraObject.AddComponent<AudioListener>();
+            cameraObject.transform.position = new Vector3(0f, 0f, -10f);
+            camera.orthographic = true;
+            camera.orthographicSize = 5f;
+            camera.depth = -1f;
+            if (solidColor)
+            {
+                camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = new Color(0.12f, 0.14f, 0.18f, 1f);
+            }
         }
 
         private static void EnsureFolders()
@@ -44,15 +99,61 @@ namespace EditorTools
             Directory.CreateDirectory(ScenesPath);
             Directory.CreateDirectory(DataPath);
             Directory.CreateDirectory("Assets/Part2_Adventure/Data");
-            Directory.CreateDirectory("Assets/Part3_EscapeRoom/Data");
-            Directory.CreateDirectory("Assets/Part3_EscapeRoom/Resources/Diagrams");
-            CopyEscapeRoomDiagrams();
+            Directory.CreateDirectory("Assets/UI/Data");
+        }
+
+        private static UiTheme CreateOrUpdateTheme()
+        {
+            var theme = AssetDatabase.LoadAssetAtPath<UiTheme>(ThemePath);
+            if (theme == null)
+            {
+                theme = ScriptableObject.CreateInstance<UiTheme>();
+                AssetDatabase.CreateAsset(theme, ThemePath);
+            }
+
+            var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(TmpFontPath);
+            if (font == null && TMP_Settings.defaultFontAsset != null)
+            {
+                font = TMP_Settings.defaultFontAsset;
+            }
+
+            theme.ApplyReadableDefaults(font);
+            EditorUtility.SetDirty(theme);
+            return theme;
+        }
+
+        private static void NormalizeCanvasTransforms()
+        {
+            foreach (var canvas in Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                var rect = canvas.GetComponent<RectTransform>();
+                if (rect == null)
+                {
+                    continue;
+                }
+
+                // Batchmode saves can bake scale (0,0,0) into overlay canvases.
+                if (rect.localScale.sqrMagnitude < 0.01f)
+                {
+                    rect.localScale = Vector3.one;
+                }
+
+                if (!canvas.TryGetComponent<AdaptiveCanvasGuard>(out _))
+                {
+                    canvas.gameObject.AddComponent<AdaptiveCanvasGuard>();
+                }
+            }
+        }
+
+        private static UiTheme GetTheme()
+        {
+            return CreateOrUpdateTheme();
         }
 
         private static GameCatalog CreateDataAssets()
         {
-            var pickupChannel = GetOrCreateAsset<PickupEventChannel>("Assets/Part2_Adventure/Data/PickupEventChannel.asset");
-            var scoreService = GetOrCreateAsset<ScoreService>("Assets/Part2_Adventure/Data/ScoreService.asset");
+            GetOrCreateAsset<PickupEventChannel>("Assets/Part2_Adventure/Data/PickupEventChannel.asset");
+            GetOrCreateAsset<ScoreService>("Assets/Part2_Adventure/Data/ScoreService.asset");
 
             var tttLevel = GetOrCreateAsset<LevelDefinition>($"{DataPath}/TTT_SingleMatch.asset");
             SetLevel(tttLevel, "Single Match", 0, 2f, 0, 0, 0);
@@ -64,29 +165,28 @@ namespace EditorTools
             var advHard = GetOrCreateAsset<LevelDefinition>($"{DataPath}/Adventure_Hard.asset");
             SetLevel(advHard, "Hard", 2, 4f, 6, 10, 0);
 
-            var escapePlayLevel = GetOrCreateAsset<LevelDefinition>($"{DataPath}/EscapeRoom_Play.asset");
-            SetLevel(escapePlayLevel, "Crimson Mini Room", 0, 0f, 0, 0, 0);
-            var escapeDocsLevel = GetOrCreateAsset<LevelDefinition>($"{DataPath}/EscapeRoom_Architecture.asset");
-            SetLevel(escapeDocsLevel, "Architecture Docs", 1, 0f, 0, 0, 0, "EscapeRoomArchitecture");
-
-            CreateEscapeRoomDataAssets();
+            var unseenSmall = GetOrCreateAsset<LevelDefinition>($"{DataPath}/Unseen_Small.asset");
+            SetLevel(unseenSmall, "50 Entities", 0, 0f, 0, 0, 50);
+            var unseenLarge = GetOrCreateAsset<LevelDefinition>($"{DataPath}/Unseen_Large.asset");
+            SetLevel(unseenLarge, "200 Entities", 1, 0f, 0, 0, 200);
 
             var tttMode = GetOrCreateAsset<GameModeDefinition>($"{DataPath}/Mode_TicTacToe.asset");
-            SetMode(tttMode, "Part 1 — Tic Tac Toe", "TicTacToe", new[] { tttLevel });
+            SetMode(tttMode, "Tic Tac Toe", "TicTacToe", new[] { tttLevel });
             var advMode = GetOrCreateAsset<GameModeDefinition>($"{DataPath}/Mode_Adventure.asset");
-            SetMode(advMode, "Part 2 — Adventure", "Adventure", new[] { advEasy, advNormal, advHard });
-            var escapeMode = GetOrCreateAsset<GameModeDefinition>($"{DataPath}/Mode_EscapeRoom.asset");
-            SetMode(escapeMode, "Part 3 — Escape Room", "EscapeRoom", new[] { escapePlayLevel, escapeDocsLevel });
+            SetMode(advMode, "Adventure", "Adventure", new[] { advEasy, advNormal, advHard });
+            var unseenMode = GetOrCreateAsset<GameModeDefinition>($"{DataPath}/Mode_Unseen.asset");
+            SetMode(unseenMode, "Spatial Partition Demo", "UnseenDemo", new[] { unseenSmall, unseenLarge });
 
             var catalog = GetOrCreateAsset<GameCatalog>($"{DataPath}/GameCatalog.asset");
-            SetCatalog(catalog, new[] { tttMode, advMode, escapeMode });
-
+            SetCatalog(catalog, new[] { tttMode, advMode, unseenMode });
             return catalog;
         }
 
         private static void CreateBootstrapScene()
         {
+            var theme = GetTheme();
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            CreateSceneCamera(solidColor: true);
 
             var managers = new GameObject("PersistentManagers");
             var flow = managers.AddComponent<GameFlowManager>();
@@ -96,35 +196,28 @@ namespace EditorTools
             SetPrivateField(flow, "catalog", catalog);
             SetPrivateField(flow, "mainMenuSceneName", "MainMenu");
 
-            CreatePersistentUiShell();
+            CreatePersistentUiShell(theme);
 
             var bootstrap = new GameObject("BootstrapLoader");
             bootstrap.AddComponent<BootstrapLoader>();
 
+            NormalizeCanvasTransforms();
             EditorSceneManager.SaveScene(scene, $"{ScenesPath}/Bootstrap.unity");
         }
 
         private static void CreateMainMenuScene()
         {
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
-            var mainCamera = Camera.main;
-            if (mainCamera != null)
-            {
-                mainCamera.clearFlags = CameraClearFlags.SolidColor;
-                mainCamera.backgroundColor = new Color(0.12f, 0.14f, 0.18f, 1f);
-                mainCamera.orthographic = true;
-            }
-
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            CreateSceneCamera(solidColor: true);
             EditorSceneManager.SaveScene(scene, $"{ScenesPath}/MainMenu.unity");
         }
 
-        private static ScreenManager CreatePersistentUiShell()
+        private static ScreenManager CreatePersistentUiShell(UiTheme theme)
         {
             var eventSystem = CreateEventSystem();
 
-            var canvas = CreateCanvas("PersistentUI");
+            var canvas = UiFactory.CreateScaledCanvas("PersistentUI", theme);
             canvas.AddComponent<PersistentUIInitializer>();
-            canvas.AddComponent<UI.UiLayoutFixer>();
             if (eventSystem != null)
             {
                 eventSystem.transform.SetParent(canvas.transform, false);
@@ -134,73 +227,75 @@ namespace EditorTools
             screenManagerObject.transform.SetParent(canvas.transform, false);
             var screenManager = screenManagerObject.AddComponent<ScreenManager>();
 
-            var mainMenu = CreatePanel(canvas.transform, "MainMenuScreen", new Vector2(0, 0), new Vector2(500, 400));
-            var mainMenuScreen = mainMenu.AddComponent<MainMenuScreen>();
-            var title = CreateText(mainMenu.transform, "Title", "Design Patterns Games", 36, new Vector2(0, 140));
-            var dropdown = CreateDropdown(mainMenu.transform, "ModeDropdown", new Vector2(0, 40));
-            var playButton = CreateButton(mainMenu.transform, "PlayButton", "Play", new Vector2(-80, -80));
-            var quitButton = CreateButton(mainMenu.transform, "QuitButton", "Quit", new Vector2(80, -80));
+            var mainMenuRoot = CreateScreenRoot(canvas.transform, "MainMenuScreen", theme);
+            var mainMenuScreen = mainMenuRoot.AddComponent<MainMenuScreen>();
+            var mainCard = UiFactory.CreateMenuCard(mainMenuRoot.transform, "Card", theme);
+            UiFactory.CreateFlexibleSpacer(mainCard.transform, 0.8f);
+            UiFactory.CreateText(mainCard.transform, "Title", "Design Patterns Games", theme.TitleSize, theme);
+            var dropdown = UiFactory.CreateDropdown(mainCard.transform, "ModeDropdown", theme);
+            var mainButtons = UiFactory.CreateHorizontalStack(mainCard.transform, "Buttons", theme.Spacing, theme.ButtonHeight);
+            var playButton = UiFactory.CreateButton(mainButtons.transform, "PlayButton", "Play", theme, primary: true);
+            var quitButton = UiFactory.CreateButton(mainButtons.transform, "QuitButton", "Quit", theme, primary: false);
+            UiFactory.CreateFlexibleSpacer(mainCard.transform, 0.8f);
             SetPrivateField(mainMenuScreen, "modeDropdown", dropdown);
             SetPrivateField(mainMenuScreen, "playButton", playButton);
             SetPrivateField(mainMenuScreen, "quitButton", quitButton);
 
-            var levelSelect = CreatePanel(canvas.transform, "LevelSelectScreen", Vector2.zero, new Vector2(500, 450));
-            var levelSelectScreen = levelSelect.AddComponent<LevelSelectScreen>();
-            levelSelect.SetActive(false);
-            var levelTitle = CreateText(levelSelect.transform, "Title", "Select Level", 28, new Vector2(0, 170));
-            var levelContainer = new GameObject("LevelButtonContainer");
-            levelContainer.transform.SetParent(levelSelect.transform, false);
-            var containerRect = levelContainer.AddComponent<RectTransform>();
-            containerRect.sizeDelta = new Vector2(400, 250);
-            containerRect.anchoredPosition = new Vector2(0, 20);
-            var layout = levelContainer.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 8;
-            layout.childAlignment = TextAnchor.UpperCenter;
-            layout.childControlHeight = true;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
-            layout.childForceExpandWidth = true;
-            var levelButtonPrefab = CreateButton(levelContainer.transform, "LevelButtonPrefab", "Level", Vector2.zero);
+            var levelRoot = CreateScreenRoot(canvas.transform, "LevelSelectScreen", theme);
+            levelRoot.SetActive(false);
+            var levelSelectScreen = levelRoot.AddComponent<LevelSelectScreen>();
+            var levelCard = UiFactory.CreateMenuCard(levelRoot.transform, "Card", theme);
+            var levelTitle = UiFactory.CreateText(levelCard.transform, "Title", "Select Level", theme.TitleSize, theme);
+            var levelContainer = UiFactory.CreateVerticalStack(levelCard.transform, "LevelButtonContainer", theme.Spacing);
+            var levelLayout = levelContainer.GetComponent<LayoutElement>();
+            levelLayout.minHeight = theme.ButtonHeight * 3.5f;
+            levelLayout.preferredHeight = theme.ButtonHeight * 3.5f;
+            levelLayout.flexibleHeight = 1f;
+            var levelButtonPrefab = UiFactory.CreateButton(levelContainer.transform, "LevelButtonPrefab", "Level", theme);
             levelButtonPrefab.gameObject.SetActive(false);
-            var backButton = CreateButton(levelSelect.transform, "BackButton", "Back", new Vector2(0, -180));
+            var backButton = UiFactory.CreateButton(levelCard.transform, "BackButton", "Back", theme, primary: false);
             SetPrivateField(levelSelectScreen, "levelButtonContainer", levelContainer.transform);
             SetPrivateField(levelSelectScreen, "levelButtonPrefab", levelButtonPrefab);
             SetPrivateField(levelSelectScreen, "backButton", backButton);
             SetPrivateField(levelSelectScreen, "titleText", levelTitle);
 
-            var gameOver = CreatePanel(canvas.transform, "GameOverScreen", Vector2.zero, new Vector2(560, 340));
-            var gameOverScreen = gameOver.AddComponent<GameOverScreen>();
-            gameOver.SetActive(false);
-            var goMessage = CreateText(gameOver.transform, "Message", "Game Over", 24, new Vector2(0, 80));
-            goMessage.textWrappingMode = TextWrappingModes.Normal;
-            goMessage.overflowMode = TextOverflowModes.Truncate;
-            goMessage.enableAutoSizing = true;
-            goMessage.fontSizeMin = 18;
-            goMessage.fontSizeMax = 28;
-            goMessage.rectTransform.sizeDelta = new Vector2(500, 120);
-            var retryBtn = CreateButton(gameOver.transform, "RetryButton", "Retry", new Vector2(-90, -100));
-            var goMenuBtn = CreateButton(gameOver.transform, "MainMenuButton", "Main Menu", new Vector2(90, -100));
-            SetPrivateField(gameOverScreen, "messageText", goMessage);
-            SetPrivateField(gameOverScreen, "retryButton", retryBtn);
-            SetPrivateField(gameOverScreen, "mainMenuButton", goMenuBtn);
-
-            var pause = CreatePanel(canvas.transform, "PauseScreen", Vector2.zero, new Vector2(560, 360));
-            var pauseScreen = pause.AddComponent<PauseScreen>();
-            pause.SetActive(false);
-            var pauseTitle = CreateText(pause.transform, "Title", "Paused", 32, new Vector2(0, 120));
-            var resumeBtn = CreateButton(pause.transform, "ResumeButton", "Resume", new Vector2(0, 40));
-            var restartBtn = CreateButton(pause.transform, "RestartButton", "Restart", new Vector2(0, -20));
-            var levelBtn = CreateButton(pause.transform, "LevelSelectButton", "Main Menu", new Vector2(0, -80));
-            var menuBtn = CreateButton(pause.transform, "MainMenuButton", "Quit", new Vector2(0, -140));
+            var pauseRoot = CreateScreenRoot(canvas.transform, "PauseScreen", theme);
+            pauseRoot.SetActive(false);
+            var pauseScreen = pauseRoot.AddComponent<PauseScreen>();
+            var pauseCard = UiFactory.CreateMenuCard(pauseRoot.transform, "Card", theme);
+            UiFactory.CreateFlexibleSpacer(pauseCard.transform, 1f);
+            UiFactory.CreateText(pauseCard.transform, "Title", "Paused", theme.TitleSize, theme);
+            var resumeBtn = UiFactory.CreateButton(pauseCard.transform, "ResumeButton", "Resume", theme);
+            var restartBtn = UiFactory.CreateButton(pauseCard.transform, "RestartButton", "Restart", theme, primary: false);
+            var levelBtn = UiFactory.CreateButton(pauseCard.transform, "LevelSelectButton", "Main Menu", theme, primary: false);
+            var menuBtn = UiFactory.CreateButton(pauseCard.transform, "MainMenuButton", "Quit To Menu", theme, primary: false);
+            UiFactory.CreateFlexibleSpacer(pauseCard.transform, 1f);
             SetPrivateField(pauseScreen, "resumeButton", resumeBtn);
             SetPrivateField(pauseScreen, "restartButton", restartBtn);
             SetPrivateField(pauseScreen, "levelSelectButton", levelBtn);
             SetPrivateField(pauseScreen, "mainMenuButton", menuBtn);
 
-            var loading = CreatePanel(canvas.transform, "LoadingScreen", Vector2.zero, new Vector2(400, 120));
-            var loadingScreen = loading.AddComponent<LoadingScreen>();
-            loading.SetActive(false);
-            var loadingText = CreateText(loading.transform, "Progress", "Loading...", 24, Vector2.zero);
+            var gameOverRoot = CreateScreenRoot(canvas.transform, "GameOverScreen", theme);
+            gameOverRoot.SetActive(false);
+            var gameOverScreen = gameOverRoot.AddComponent<GameOverScreen>();
+            var gameOverCard = UiFactory.CreateMenuCard(gameOverRoot.transform, "Card", theme);
+            UiFactory.CreateFlexibleSpacer(gameOverCard.transform, 1f);
+            var goMessage = UiFactory.CreateText(gameOverCard.transform, "Message", "Game Over", theme.TitleSize, theme);
+            var goButtons = UiFactory.CreateHorizontalStack(gameOverCard.transform, "Buttons", theme.Spacing, theme.ButtonHeight);
+            var retryBtn = UiFactory.CreateButton(goButtons.transform, "RetryButton", "Retry", theme);
+            var goMenuBtn = UiFactory.CreateButton(goButtons.transform, "MainMenuButton", "Main Menu", theme, primary: false);
+            UiFactory.CreateFlexibleSpacer(gameOverCard.transform, 1f);
+            SetPrivateField(gameOverScreen, "messageText", goMessage);
+            SetPrivateField(gameOverScreen, "retryButton", retryBtn);
+            SetPrivateField(gameOverScreen, "mainMenuButton", goMenuBtn);
+
+            var loadingRoot = CreateScreenRoot(canvas.transform, "LoadingScreen", theme);
+            loadingRoot.SetActive(false);
+            var loadingScreen = loadingRoot.AddComponent<LoadingScreen>();
+            var loadingCard = UiFactory.CreateMenuCard(loadingRoot.transform, "Card", theme);
+            UiFactory.CreateFlexibleSpacer(loadingCard.transform, 1f);
+            var loadingText = UiFactory.CreateText(loadingCard.transform, "Progress", "Loading...", theme.BodySize, theme);
+            UiFactory.CreateFlexibleSpacer(loadingCard.transform, 1f);
             SetPrivateField(loadingScreen, "progressText", loadingText);
 
             SetPrivateField(screenManager, "mainMenuScreen", mainMenuScreen);
@@ -212,65 +307,56 @@ namespace EditorTools
             return screenManager;
         }
 
+        private static GameObject CreateScreenRoot(Transform parent, string name, UiTheme theme)
+        {
+            var root = UiFactory.CreateFullScreenOverlay(parent, name, theme.OverlayColor);
+            return root;
+        }
+
         private static void CreateTicTacToeScene()
         {
+            var theme = GetTheme();
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            CreateSceneCamera(solidColor: true);
 
             var managerObject = new GameObject("TicTacToeGameManager");
             managerObject.AddComponent<TicTacToeGameManager>();
 
-            var canvas = CreateCanvas("TicTacToeCanvas");
-            var boardRoot = CreatePanel(canvas.transform, "BoardView", Vector2.zero, new Vector2(480, 540));
-            var boardRect = boardRoot.GetComponent<RectTransform>();
-            boardRect.anchorMin = new Vector2(0.5f, 0.5f);
-            boardRect.anchorMax = new Vector2(0.5f, 0.5f);
-            boardRect.pivot = new Vector2(0.5f, 0.5f);
-
-            var vertical = boardRoot.AddComponent<VerticalLayoutGroup>();
-            vertical.padding = new RectOffset(20, 20, 20, 20);
-            vertical.spacing = 10f;
-            vertical.childAlignment = TextAnchor.MiddleCenter;
-            vertical.childForceExpandWidth = true;
-            vertical.childForceExpandHeight = false;
-
+            var canvas = UiFactory.CreateScaledCanvas("TicTacToeCanvas", theme);
+            var boardRoot = UiFactory.CreateMenuCard(canvas.transform, "BoardView", theme);
             var boardView = boardRoot.AddComponent<BoardView>();
 
-            var status = CreateText(boardRoot.transform, "Status", "Turn: X", 22, new Vector2(0, 220));
-            AddLayoutElement(status.gameObject, 34f);
-            var score = CreateText(boardRoot.transform, "Score", "X: 0   O: 0", 18, new Vector2(0, 180));
-            AddLayoutElement(score.gameObject, 30f);
+            var status = UiFactory.CreateText(boardRoot.transform, "Status", "Turn: X", theme.BodySize, theme);
+            var score = UiFactory.CreateText(boardRoot.transform, "Score", "X: 0   O: 0", theme.BodySize, theme, theme.MutedTextColor);
 
             var grid = new GameObject("Grid");
             grid.transform.SetParent(boardRoot.transform, false);
-            var gridRect = grid.AddComponent<RectTransform>();
-            gridRect.sizeDelta = new Vector2(280, 280);
+            var gridLayoutElement = grid.AddComponent<LayoutElement>();
+            gridLayoutElement.minHeight = 420f;
+            gridLayoutElement.preferredHeight = 420f;
+            gridLayoutElement.flexibleHeight = 1f;
             var gridLayout = grid.AddComponent<GridLayoutGroup>();
             gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             gridLayout.constraintCount = 3;
-            gridLayout.cellSize = new Vector2(84, 84);
-            gridLayout.spacing = new Vector2(8, 8);
-            AddLayoutElement(grid, 280f);
+            gridLayout.cellSize = new Vector2(130f, 130f);
+            gridLayout.spacing = new Vector2(16f, 16f);
+            gridLayout.childAlignment = TextAnchor.MiddleCenter;
 
             var buttons = new Button[9];
             for (var i = 0; i < 9; i++)
             {
-                buttons[i] = CreateButton(grid.transform, $"Cell_{i}", string.Empty, Vector2.zero);
+                buttons[i] = UiFactory.CreateButton(grid.transform, $"Cell_{i}", string.Empty, theme, primary: false);
+                var cellLayout = buttons[i].GetComponent<LayoutElement>();
+                if (cellLayout != null)
+                {
+                    Object.DestroyImmediate(cellLayout);
+                }
             }
 
-            var actions = new GameObject("Actions");
-            actions.transform.SetParent(boardRoot.transform, false);
-            var actionsRect = actions.AddComponent<RectTransform>();
-            actionsRect.sizeDelta = new Vector2(420f, 44f);
-            var actionsLayout = actions.AddComponent<HorizontalLayoutGroup>();
-            actionsLayout.spacing = 12f;
-            actionsLayout.childAlignment = TextAnchor.MiddleCenter;
-            actionsLayout.childForceExpandWidth = true;
-            actionsLayout.childForceExpandHeight = true;
-            AddLayoutElement(actions, 44f);
-
-            var undo = CreateButton(actions.transform, "UndoButton", "Undo", Vector2.zero);
-            var redo = CreateButton(actions.transform, "RedoButton", "Redo", Vector2.zero);
-            var restart = CreateButton(actions.transform, "RestartButton", "Restart", Vector2.zero);
+            var actions = UiFactory.CreateHorizontalStack(boardRoot.transform, "Actions", theme.Spacing, theme.ButtonHeight);
+            var undo = UiFactory.CreateButton(actions.transform, "UndoButton", "Undo", theme, primary: false);
+            var redo = UiFactory.CreateButton(actions.transform, "RedoButton", "Redo", theme, primary: false);
+            var restart = UiFactory.CreateButton(actions.transform, "RestartButton", "Restart", theme);
 
             SetPrivateField(boardView, "cellButtons", buttons);
             SetPrivateField(boardView, "statusText", status);
@@ -285,252 +371,50 @@ namespace EditorTools
 
             new GameObject("GamePauseHandler").AddComponent<GamePauseHandler>();
 
+            NormalizeCanvasTransforms();
             EditorSceneManager.SaveScene(scene, $"{ScenesPath}/TicTacToe.unity");
-        }
-
-        private static void CreateEscapeRoomScene()
-        {
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
-
-            var mainCamera = Camera.main;
-            if (mainCamera != null)
-            {
-                mainCamera.clearFlags = CameraClearFlags.SolidColor;
-                mainCamera.backgroundColor = new Color(0.08f, 0.07f, 0.09f, 1f);
-                mainCamera.fieldOfView = 50f;
-                mainCamera.transform.position = new Vector3(0f, 6.8f, -5.8f);
-                mainCamera.transform.rotation = Quaternion.Euler(48f, 0f, 0f);
-            }
-
-            var setup = AssetDatabase.LoadAssetAtPath<EscapeRoomSetupSO>(
-                "Assets/Part3_EscapeRoom/Resources/EscapeRoomSetup.asset");
-            var controllerObject = new GameObject("EscapeRoomGameController");
-            var controller = controllerObject.AddComponent<EscapeRoomGameController>();
-            SetPrivateField(controller, "setup", setup);
-            SetPrivateField(controller, "raycastCamera", mainCamera);
-
-            new GameObject("GamePauseHandler").AddComponent<GamePauseHandler>();
-            CreateEventSystem();
-
-            EditorSceneManager.SaveScene(scene, $"{ScenesPath}/EscapeRoom.unity");
-        }
-
-        private static void CreateEscapeRoomDataAssets()
-        {
-            const string folder = "Assets/Part3_EscapeRoom/Data";
-            Directory.CreateDirectory(folder);
-
-            var rustyKey = GetOrCreateAsset<ItemDefinition>($"{folder}/Item_RustyKey.asset");
-            SetItemDefinition(rustyKey, "rustyKey", "Rusty Key", ItemType.Collectible);
-            var goldKey = GetOrCreateAsset<ItemDefinition>($"{folder}/Item_GoldKey.asset");
-            SetItemDefinition(goldKey, "goldKey", "Gold Key", ItemType.Collectible);
-            var note = GetOrCreateAsset<ItemDefinition>($"{folder}/Item_Note.asset");
-            SetItemDefinition(note, "note", "Note", ItemType.Collectible);
-
-            var keyOnDrawer = GetOrCreateAsset<InteractionRuleSO>($"{folder}/Rule_KeyOnDrawer.asset");
-            SetInteractionRule(
-                keyOnDrawer,
-                "rustyKey",
-                "drawer",
-                "Drawer opened.",
-                new[]
-                {
-                    new InteractionAction { ActionType = InteractionActionType.ConsumeItem, TargetId = "rustyKey" },
-                    new InteractionAction { ActionType = InteractionActionType.SetState, TargetId = "drawer", State = RoomObjectState.Open },
-                    new InteractionAction { ActionType = InteractionActionType.SetState, TargetId = "note", State = RoomObjectState.Revealed }
-                });
-
-            var keyOnDoor = GetOrCreateAsset<InteractionRuleSO>($"{folder}/Rule_KeyOnDoor.asset");
-            SetInteractionRule(
-                keyOnDoor,
-                "goldKey",
-                "door",
-                "The door unlocks. You escaped!",
-                new[]
-                {
-                    new InteractionAction { ActionType = InteractionActionType.ConsumeItem, TargetId = "goldKey" },
-                    new InteractionAction { ActionType = InteractionActionType.SetState, TargetId = "door", State = RoomObjectState.Unlocked },
-                    new InteractionAction { ActionType = InteractionActionType.Win }
-                });
-
-            var drawerOpenCondition = GetOrCreateAsset<StateConditionSO>($"{folder}/Condition_DrawerOpen.asset");
-            SetPrivateField(drawerOpenCondition, "ObjectId", "drawer");
-            SetPrivateField(drawerOpenCondition, "RequiredState", RoomObjectState.Open);
-            EditorUtility.SetDirty(drawerOpenCondition);
-
-            var readNoteCondition = GetOrCreateAsset<FlagConditionSO>($"{folder}/Condition_HasReadNote.asset");
-            SetPrivateField(readNoteCondition, "FlagName", "hasReadNote");
-            SetPrivateField(readNoteCondition, "RequiredValue", true);
-            EditorUtility.SetDirty(readNoteCondition);
-
-            var safePuzzle = GetOrCreateAsset<PuzzleDefinition>($"{folder}/Puzzle_Safe.asset");
-            SetPrivateField(safePuzzle, "PuzzleId", "safe_code");
-            SetPrivateField(safePuzzle, "StatePrerequisites", new[] { drawerOpenCondition });
-            SetPrivateField(safePuzzle, "FlagPrerequisites", new[] { readNoteCondition });
-            SetPrivateField(safePuzzle, "RequiredCode", "7391");
-            SetPrivateField(safePuzzle, "RewardItemId", "goldKey");
-            SetPrivateField(safePuzzle, "TargetObjectId", "safe");
-            EditorUtility.SetDirty(safePuzzle);
-
-            var setup = GetOrCreateAsset<EscapeRoomSetupSO>("Assets/Part3_EscapeRoom/Resources/EscapeRoomSetup.asset");
-            SetPrivateField(setup, "RoomId", "crimson_mini");
-            SetPrivateField(setup, "SafeCode", "7391");
-            SetPrivateField(setup, "HintText",
-                "Click objects to examine or pick them up.\nSelect an inventory item, then click a target to use it.\nEsc pauses.");
-            SetPrivateField(setup, "Items", new[] { rustyKey, goldKey, note });
-            SetPrivateField(setup, "InteractionRules", new[] { keyOnDrawer, keyOnDoor });
-            SetPrivateField(setup, "SafePuzzle", safePuzzle);
-            SetPrivateField(setup, "InitialStates", new[]
-            {
-                new InitialRoomState { ObjectId = "drawer", State = RoomObjectState.Closed },
-                new InitialRoomState { ObjectId = "note", State = RoomObjectState.Locked },
-                new InitialRoomState { ObjectId = "safe", State = RoomObjectState.Locked },
-                new InitialRoomState { ObjectId = "door", State = RoomObjectState.Locked }
-            });
-            EditorUtility.SetDirty(setup);
-        }
-
-        private static void SetItemDefinition(ItemDefinition item, string id, string displayName, ItemType type)
-        {
-            SetPrivateField(item, "ItemId", id);
-            SetPrivateField(item, "DisplayName", displayName);
-            SetPrivateField(item, "Type", type);
-            EditorUtility.SetDirty(item);
-        }
-
-        private static void SetInteractionRule(
-            InteractionRuleSO rule,
-            string sourceId,
-            string targetId,
-            string successMessage,
-            InteractionAction[] actions)
-        {
-            SetPrivateField(rule, "SourceItemId", sourceId);
-            SetPrivateField(rule, "TargetInteractableId", targetId);
-            SetPrivateField(rule, "SuccessMessage", successMessage);
-            SetPrivateField(rule, "Actions", actions);
-            EditorUtility.SetDirty(rule);
-        }
-
-        private static void CreateEscapeRoomArchitectureScene()
-        {
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
-
-            var mainCamera = Camera.main;
-            if (mainCamera != null)
-            {
-                mainCamera.clearFlags = CameraClearFlags.SolidColor;
-                mainCamera.backgroundColor = new Color(0.1f, 0.11f, 0.14f, 1f);
-            }
-
-            var viewer = new GameObject("EscapeRoomArchitectureViewer");
-            viewer.AddComponent<EscapeRoomArchitectureViewer>();
-
-            EditorSceneManager.SaveScene(scene, $"{ScenesPath}/EscapeRoomArchitecture.unity");
-        }
-
-        private static void CopyEscapeRoomDiagrams()
-        {
-            const string sourceFolder = "Docs/Part3_EscapeRoom";
-            const string targetFolder = "Assets/Part3_EscapeRoom/Resources/Diagrams";
-            if (!Directory.Exists(sourceFolder))
-            {
-                return;
-            }
-
-            foreach (var file in Directory.GetFiles(sourceFolder, "*.png"))
-            {
-                var targetPath = Path.Combine(targetFolder, Path.GetFileName(file));
-                File.Copy(file, targetPath, true);
-            }
-        }
-
-        private static void ConfigureEscapeRoomDiagramSprites()
-        {
-            const string folder = "Assets/Part3_EscapeRoom/Resources/Diagrams";
-            if (!Directory.Exists(folder))
-            {
-                return;
-            }
-
-            foreach (var file in Directory.GetFiles(folder, "*.png"))
-            {
-                var assetPath = file.Replace('\\', '/');
-                if (!assetPath.StartsWith("Assets/"))
-                {
-                    continue;
-                }
-
-                var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
-                if (importer == null)
-                {
-                    continue;
-                }
-
-                importer.textureType = TextureImporterType.Sprite;
-                importer.spriteImportMode = SpriteImportMode.Single;
-                importer.SaveAndReimport();
-            }
         }
 
         private static void CreateAdventureScene()
         {
+            var theme = GetTheme();
             var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
             var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
             plane.name = "Ground";
             plane.transform.localScale = new Vector3(4f, 1f, 4f);
-            plane.GetComponent<Renderer>().sharedMaterial.color = Color.white;
+            plane.AddComponent<CheckerboardGround>();
 
             var player = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             player.name = "Player";
             player.transform.position = new Vector3(0f, 1f, 0f);
-            player.GetComponent<Renderer>().sharedMaterial.color = new Color(0.25f, 0.55f, 1f, 1f);
-            var playerBody = player.AddComponent<Rigidbody>();
-            playerBody.useGravity = false;
-            var playerController = player.AddComponent<PlayerController>();
-            var playerCollider = player.GetComponent<CapsuleCollider>();
-            playerCollider.height = 2f;
-
-            var cameraFollow = Camera.main != null ? Camera.main.gameObject.AddComponent<AdventureCameraFollow>() : null;
-            if (Camera.main != null)
-            {
-                Camera.main.transform.position = new Vector3(0f, 14f, -8f);
-                Camera.main.transform.rotation = Quaternion.Euler(60f, 0f, 0f);
-            }
+            player.AddComponent<Rigidbody>();
+            player.AddComponent<PlayerController>();
+            player.GetComponent<CapsuleCollider>().height = 2f;
 
             var enemyPrefab = CreateEnemyPrefab();
             var pickupPrefab = CreatePickupPrefab();
-
             var spawnRoot = new GameObject("SpawnRoot").transform;
 
-            var canvas = CreateCanvas("AdventureHUD");
-            var scoreText = CreateHudText(
+            var canvas = UiFactory.CreateScaledCanvas("AdventureHUD", theme);
+            var scoreText = UiFactory.CreateHudText(
                 canvas.transform,
                 "ScoreText",
                 "Score: 0",
-                22,
-                new Vector2(24f, -24f),
-                new Vector2(420f, 64f));
+                theme,
+                TextAnchor.UpperLeft,
+                new Vector2(520f, 80f));
             var scoreViewObject = scoreText.gameObject.AddComponent<ScoreView>();
             var scoreService = AssetDatabase.LoadAssetAtPath<ScoreService>("Assets/Part2_Adventure/Data/ScoreService.asset");
             SetPrivateField(scoreViewObject, "scoreService", scoreService);
             SetPrivateField(scoreViewObject, "scoreText", scoreText);
 
-            CreateHudText(
-                canvas.transform,
-                "InstructionsText",
-                "Controls: WASD move · Esc pause\nWin: collect all pickups\nLose: enemy touches you",
-                13,
-                new Vector2(16f, -64f),
-                new Vector2(360f, 120f));
-
-            var mapPanel = CreatePanel(canvas.transform, "Minimap", new Vector2(-32f, -32f), new Vector2(180, 180));
+            var mapPanel = new GameObject("Minimap");
+            mapPanel.transform.SetParent(canvas.transform, false);
+            var mapImage = mapPanel.AddComponent<Image>();
+            mapImage.color = new Color(0.08f, 0.1f, 0.14f, 0.85f);
             var mapRoot = mapPanel.GetComponent<RectTransform>();
-            mapRoot.anchorMin = new Vector2(1f, 1f);
-            mapRoot.anchorMax = new Vector2(1f, 1f);
-            mapRoot.pivot = new Vector2(1f, 1f);
-            mapRoot.anchoredPosition = new Vector2(-32f, -32f);
+            UiFactory.ApplyCorner(mapRoot, TextAnchor.UpperRight, new Vector2(280f, 280f), new Vector2(32f, 32f));
             var markerPrefab = CreateImageMarker(mapPanel.transform);
             var minimap = mapPanel.AddComponent<MinimapController>();
             var pickupChannel = AssetDatabase.LoadAssetAtPath<PickupEventChannel>("Assets/Part2_Adventure/Data/PickupEventChannel.asset");
@@ -539,17 +423,11 @@ namespace EditorTools
             SetPrivateField(minimap, "pickupEventChannel", pickupChannel);
             SetPrivateField(minimap, "worldCenter", player.transform);
             SetPrivateField(minimap, "worldSize", 40f);
-            SetPrivateField(minimap, "mapSize", 80f);
-
-            var scoreHandlerObject = new GameObject("PickupScoreHandler");
-            var scoreHandler = scoreHandlerObject.AddComponent<PickupScoreHandler>();
-            SetPrivateField(scoreHandler, "pickupEventChannel", pickupChannel);
-            SetPrivateField(scoreHandler, "scoreService", scoreService);
+            SetPrivateField(minimap, "mapSize", 90f);
 
             var controllerObject = new GameObject("AdventureController");
             var controller = controllerObject.AddComponent<AdventureGameController>();
             SetPrivateField(controller, "player", player.transform);
-            SetPrivateField(controller, "cameraFollow", cameraFollow);
             SetPrivateField(controller, "enemyPrefab", enemyPrefab);
             SetPrivateField(controller, "pickupPrefab", pickupPrefab);
             SetPrivateField(controller, "pickupEventChannel", pickupChannel);
@@ -560,30 +438,86 @@ namespace EditorTools
 
             new GameObject("GamePauseHandler").AddComponent<GamePauseHandler>();
 
+            NormalizeCanvasTransforms();
             EditorSceneManager.SaveScene(scene, $"{ScenesPath}/Adventure.unity");
+        }
+
+        private static void CreateUnseenDemoScene()
+        {
+            var theme = GetTheme();
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+
+            var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            plane.transform.localScale = new Vector3(3f, 1f, 3f);
+
+            var canvas = UiFactory.CreateScaledCanvas("UnseenHUD", theme);
+            var status = UiFactory.CreateHudText(
+                canvas.transform,
+                "Status",
+                "Spatial Partition Demo",
+                theme,
+                TextAnchor.UpperLeft,
+                new Vector2(720f, 280f));
+            status.fontSize = theme.BodySize;
+
+            var demoObject = new GameObject("SpatialPartitionDemo");
+            var demo = demoObject.AddComponent<SpatialPartitionDemo>();
+            SetPrivateField(demo, "statusText", status);
+            SetPrivateField(demo, "queryRadius", 8f);
+            SetPrivateField(demo, "cellSize", 4f);
+
+            new GameObject("GamePauseHandler").AddComponent<GamePauseHandler>();
+
+            NormalizeCanvasTransforms();
+            EditorSceneManager.SaveScene(scene, $"{ScenesPath}/UnseenDemo.unity");
         }
 
         private static GameObject CreateEnemyPrefab()
         {
             const string path = "Assets/Part2_Adventure/Enemy.prefab";
-            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-            if (existing != null)
+            var existed = AssetDatabase.LoadAssetAtPath<GameObject>(path) != null;
+            GameObject enemyRoot;
+            if (existed)
             {
-                return existing;
+                enemyRoot = PrefabUtility.LoadPrefabContents(path);
+            }
+            else
+            {
+                enemyRoot = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                enemyRoot.name = "Enemy";
             }
 
-            var enemy = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            enemy.name = "Enemy";
-            enemy.GetComponent<Renderer>().sharedMaterial.color = Color.red;
-            var collider = enemy.GetComponent<BoxCollider>();
-            collider.isTrigger = true;
-            var body = enemy.AddComponent<Rigidbody>();
+            if (enemyRoot.GetComponent<EnemyController>() == null)
+            {
+                enemyRoot.AddComponent<EnemyController>();
+            }
+
+            var body = enemyRoot.GetComponent<Rigidbody>();
+            if (body == null)
+            {
+                body = enemyRoot.AddComponent<Rigidbody>();
+            }
+
             body.isKinematic = true;
             body.useGravity = false;
-            enemy.AddComponent<EnemyController>();
-            var prefab = PrefabUtility.SaveAsPrefabAsset(enemy, path);
-            Object.DestroyImmediate(enemy);
-            return prefab;
+
+            var collider = enemyRoot.GetComponent<Collider>();
+            if (collider != null)
+            {
+                collider.isTrigger = true;
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(enemyRoot, path);
+            if (existed)
+            {
+                PrefabUtility.UnloadPrefabContents(enemyRoot);
+            }
+            else
+            {
+                Object.DestroyImmediate(enemyRoot);
+            }
+
+            return AssetDatabase.LoadAssetAtPath<GameObject>(path);
         }
 
         private static GameObject CreatePickupPrefab()
@@ -599,8 +533,7 @@ namespace EditorTools
             pickup.name = "Pickup";
             pickup.transform.localScale = new Vector3(0.6f, 0.3f, 0.6f);
             pickup.GetComponent<Renderer>().sharedMaterial.color = Color.yellow;
-            var collider = pickup.GetComponent<CapsuleCollider>();
-            collider.isTrigger = true;
+            pickup.GetComponent<CapsuleCollider>().isTrigger = true;
             pickup.AddComponent<Pickup>();
             var prefab = PrefabUtility.SaveAsPrefabAsset(pickup, path);
             Object.DestroyImmediate(pickup);
@@ -615,8 +548,7 @@ namespace EditorTools
                 $"{ScenesPath}/MainMenu.unity",
                 $"{ScenesPath}/TicTacToe.unity",
                 $"{ScenesPath}/Adventure.unity",
-                $"{ScenesPath}/EscapeRoom.unity",
-                $"{ScenesPath}/EscapeRoomArchitecture.unity"
+                $"{ScenesPath}/UnseenDemo.unity"
             };
 
             var buildScenes = new EditorBuildSettingsScene[scenes.Length];
@@ -641,177 +573,6 @@ namespace EditorTools
             return eventSystem;
         }
 
-        private static GameObject CreateCanvas(string name)
-        {
-            var canvasObject = new GameObject(name);
-            var canvas = canvasObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvasObject.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            var scaler = canvasObject.GetComponent<CanvasScaler>();
-            scaler.referenceResolution = new Vector2(1280, 720);
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = 0.5f;
-            canvasObject.AddComponent<GraphicRaycaster>();
-            canvasObject.AddComponent<UI.AdaptiveCanvasGuard>();
-            return canvasObject;
-        }
-
-        private static GameObject CreatePanel(Transform parent, string name, Vector2 anchoredPosition, Vector2 size)
-        {
-            var panel = new GameObject(name);
-            panel.transform.SetParent(parent, false);
-            var image = panel.AddComponent<Image>();
-            image.color = new Color(0.1f, 0.1f, 0.15f, 0.92f);
-            var rect = panel.GetComponent<RectTransform>();
-            rect.sizeDelta = size;
-            rect.anchoredPosition = anchoredPosition;
-            return panel;
-        }
-
-        private static void AddLayoutElement(GameObject target, float preferredHeight)
-        {
-            var layoutElement = target.GetComponent<LayoutElement>();
-            if (layoutElement == null)
-            {
-                layoutElement = target.AddComponent<LayoutElement>();
-            }
-
-            layoutElement.minHeight = preferredHeight;
-            layoutElement.preferredHeight = preferredHeight;
-            layoutElement.flexibleHeight = 0f;
-        }
-
-        private static TMP_Text CreateHudText(
-            Transform parent,
-            string name,
-            string text,
-            int fontSize,
-            Vector2 anchoredPosition,
-            Vector2 size)
-        {
-            var textObject = new GameObject(name);
-            textObject.transform.SetParent(parent, false);
-            var tmp = textObject.AddComponent<TextMeshProUGUI>();
-            tmp.text = text;
-            tmp.fontSize = fontSize;
-            tmp.alignment = TextAlignmentOptions.TopLeft;
-            tmp.color = new Color(0.94f, 0.96f, 1f, 1f);
-            tmp.outlineWidth = 0.18f;
-            tmp.outlineColor = new Color(0f, 0f, 0f, 0.85f);
-            tmp.textWrappingMode = TextWrappingModes.Normal;
-            tmp.overflowMode = TextOverflowModes.Overflow;
-
-            var rect = textObject.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0f, 1f);
-            rect.anchorMax = new Vector2(0f, 1f);
-            rect.pivot = new Vector2(0f, 1f);
-            rect.anchoredPosition = anchoredPosition;
-            rect.sizeDelta = size;
-            return tmp;
-        }
-
-        private static TMP_Text CreateText(Transform parent, string name, string text, int fontSize, Vector2 position)
-        {
-            var textObject = new GameObject(name);
-            textObject.transform.SetParent(parent, false);
-            var tmp = textObject.AddComponent<TextMeshProUGUI>();
-            tmp.text = text;
-            tmp.fontSize = fontSize;
-            tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = Color.white;
-            var rect = textObject.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(400, 60);
-            rect.anchoredPosition = position;
-            return tmp;
-        }
-
-        private static Button CreateButton(Transform parent, string name, string label, Vector2 position)
-        {
-            var buttonObject = new GameObject(name);
-            buttonObject.transform.SetParent(parent, false);
-            var image = buttonObject.AddComponent<Image>();
-            image.color = new Color(0.2f, 0.45f, 0.85f, 1f);
-            var button = buttonObject.AddComponent<Button>();
-            var rect = buttonObject.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(140, 40);
-            rect.anchoredPosition = position;
-
-            var text = CreateText(buttonObject.transform, "Label", label, 18, Vector2.zero);
-            text.rectTransform.sizeDelta = new Vector2(140, 40);
-            return button;
-        }
-
-        private static TMP_Dropdown CreateDropdown(Transform parent, string name, Vector2 position)
-        {
-            var dropdownObject = new GameObject(name);
-            dropdownObject.transform.SetParent(parent, false);
-            var image = dropdownObject.AddComponent<Image>();
-            image.color = Color.white;
-            var dropdown = dropdownObject.AddComponent<TMP_Dropdown>();
-            var rect = dropdownObject.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(300, 40);
-            rect.anchoredPosition = position;
-
-            var labelObject = new GameObject("Label");
-            labelObject.transform.SetParent(dropdownObject.transform, false);
-            var label = labelObject.AddComponent<TextMeshProUGUI>();
-            label.fontSize = 18;
-            label.color = Color.black;
-            var labelRect = labelObject.GetComponent<RectTransform>();
-            labelRect.anchorMin = Vector2.zero;
-            labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = new Vector2(10, 0);
-            labelRect.offsetMax = new Vector2(-30, 0);
-
-            var template = new GameObject("Template");
-            template.transform.SetParent(dropdownObject.transform, false);
-            template.SetActive(false);
-            var templateImage = template.AddComponent<Image>();
-            templateImage.color = Color.white;
-            var templateRect = template.GetComponent<RectTransform>();
-            templateRect.sizeDelta = new Vector2(300, 150);
-
-            var viewport = new GameObject("Viewport");
-            viewport.transform.SetParent(template.transform, false);
-            var viewportRect = viewport.AddComponent<RectTransform>();
-            viewportRect.anchorMin = Vector2.zero;
-            viewportRect.anchorMax = Vector2.one;
-            viewportRect.offsetMin = Vector2.zero;
-            viewportRect.offsetMax = Vector2.zero;
-            viewport.AddComponent<Mask>().showMaskGraphic = false;
-            viewport.AddComponent<Image>().color = Color.white;
-
-            var content = new GameObject("Content");
-            content.transform.SetParent(viewport.transform, false);
-            var contentRect = content.AddComponent<RectTransform>();
-            contentRect.anchorMin = new Vector2(0, 1);
-            contentRect.anchorMax = new Vector2(1, 1);
-            contentRect.pivot = new Vector2(0.5f, 1);
-            contentRect.sizeDelta = new Vector2(0, 28);
-
-            var item = new GameObject("Item");
-            item.transform.SetParent(content.transform, false);
-            var itemToggle = item.AddComponent<Toggle>();
-            var itemRect = item.GetComponent<RectTransform>();
-            itemRect.sizeDelta = new Vector2(300, 28);
-            var itemLabelObject = new GameObject("Item Label");
-            itemLabelObject.transform.SetParent(item.transform, false);
-            var itemLabel = itemLabelObject.AddComponent<TextMeshProUGUI>();
-            itemLabel.fontSize = 16;
-            itemLabel.color = Color.black;
-            var itemLabelRect = itemLabelObject.GetComponent<RectTransform>();
-            itemLabelRect.anchorMin = Vector2.zero;
-            itemLabelRect.anchorMax = Vector2.one;
-            itemLabelRect.offsetMin = new Vector2(10, 0);
-            itemLabelRect.offsetMax = Vector2.zero;
-
-            dropdown.captionText = label;
-            dropdown.template = templateRect;
-            dropdown.itemText = itemLabel;
-
-            return dropdown;
-        }
-
         private static RectTransform CreateImageMarker(Transform parent)
         {
             var marker = new GameObject("MarkerPrefab");
@@ -819,7 +580,7 @@ namespace EditorTools
             var image = marker.AddComponent<Image>();
             image.color = Color.yellow;
             var rect = marker.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(8, 8);
+            rect.sizeDelta = new Vector2(12f, 12f);
             marker.SetActive(false);
             return rect;
         }
@@ -839,9 +600,9 @@ namespace EditorTools
 
         private static void SetMode(GameModeDefinition mode, string displayName, string sceneName, LevelDefinition[] levels)
         {
-            SetPrivateField(mode, "displayName", displayName);
-            SetPrivateField(mode, "sceneName", sceneName);
-            SetPrivateField(mode, "levels", levels);
+            SetPrivateField(mode, "<DisplayName>k__BackingField", displayName);
+            SetPrivateField(mode, "<SceneName>k__BackingField", sceneName);
+            SetPrivateField(mode, "<Levels>k__BackingField", levels);
             EditorUtility.SetDirty(mode);
         }
 
@@ -852,34 +613,28 @@ namespace EditorTools
             float enemySpeed,
             int enemyCount,
             int pickupCount,
-            int spatialCount,
-            string sceneOverride = null)
+            int spatialCount)
         {
-            SetPrivateField(level, "displayName", displayName);
-            SetPrivateField(level, "difficultyIndex", difficulty);
-            SetPrivateField(level, "enemySpeed", enemySpeed);
-            SetPrivateField(level, "enemyCount", enemyCount);
-            SetPrivateField(level, "pickupCount", pickupCount);
-            SetPrivateField(level, "spatialEntityCount", spatialCount);
-            SetPrivateField(level, "sceneOverride", sceneOverride ?? string.Empty);
+            SetPrivateField(level, "<DisplayName>k__BackingField", displayName);
+            SetPrivateField(level, "<DifficultyIndex>k__BackingField", difficulty);
+            SetPrivateField(level, "<EnemySpeed>k__BackingField", enemySpeed);
+            SetPrivateField(level, "<EnemyCount>k__BackingField", enemyCount);
+            SetPrivateField(level, "<PickupCount>k__BackingField", pickupCount);
+            SetPrivateField(level, "<SpatialEntityCount>k__BackingField", spatialCount);
             EditorUtility.SetDirty(level);
         }
 
         private static void SetCatalog(GameCatalog catalog, GameModeDefinition[] modes)
         {
-            SetPrivateField(catalog, "modes", modes);
+            SetPrivateField(catalog, "<Modes>k__BackingField", modes);
             EditorUtility.SetDirty(catalog);
         }
 
         private static void SetPrivateField(object target, string fieldName, object value)
         {
             var type = target.GetType();
-            var field = type.GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            if (field == null)
-            {
-                field = type.GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
-            }
-
+            var field = type.GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                        ?? type.GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
             field?.SetValue(target, value);
         }
     }

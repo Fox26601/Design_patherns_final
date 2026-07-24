@@ -8,47 +8,49 @@ namespace Core
     /// </summary>
     public class GamePauseHandler : MonoBehaviour
     {
-        private void Update()
-        {
-            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
-            {
-                TogglePause();
-            }
-        }
-
-        public void TogglePause()
-        {
-            var flow = GameFlowManager.Instance;
-            var screens = ScreenManager.Instance;
-            if (flow == null || screens == null)
-            {
-                return;
-            }
-
-            if (flow.IsPaused)
-            {
-                screens.HidePause();
-                return;
-            }
-
-            if (!screens.CanShowPause)
-            {
-                return;
-            }
-
-            screens.ShowPause();
-        }
-
+        /// <summary>
+        /// Ensures a pause handler exists in the active scene (or creates one).
+        /// </summary>
         public static GamePauseHandler EnsureExists()
         {
-            var handler = FindFirstObjectByType<GamePauseHandler>();
-            if (handler != null)
+            var existing = FindFirstObjectByType<GamePauseHandler>();
+            if (existing != null)
             {
-                return handler;
+                return existing;
             }
 
             var pauseObject = new GameObject("GamePauseHandler");
             return pauseObject.AddComponent<GamePauseHandler>();
+        }
+
+        /// <summary>
+        /// Toggles pause menu visibility.
+        /// </summary>
+        public void TogglePause()
+        {
+            if (GameFlowManager.Instance == null || ScreenManager.Instance == null)
+            {
+                return;
+            }
+
+            if (GameFlowManager.Instance.IsPaused)
+            {
+                ScreenManager.Instance.HidePause();
+            }
+            else
+            {
+                ScreenManager.Instance.ShowPause();
+            }
+        }
+
+        private void Update()
+        {
+            if (Keyboard.current == null || !Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                return;
+            }
+
+            TogglePause();
         }
     }
 }

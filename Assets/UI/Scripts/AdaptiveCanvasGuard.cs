@@ -4,19 +4,24 @@ using UnityEngine.UI;
 namespace UI
 {
     /// <summary>
-    /// Keeps a CanvasScaler configured for readable UI across resolutions.
+    /// Ensures CanvasScaler produces a readable scale even if the scene was saved with scale 0
+    /// (common after headless/batchmode scene generation).
     /// </summary>
+    [RequireComponent(typeof(Canvas))]
     [RequireComponent(typeof(CanvasScaler))]
-    [DefaultExecutionOrder(-200)]
     public class AdaptiveCanvasGuard : MonoBehaviour
     {
         [SerializeField] private Vector2 referenceResolution = new(1280f, 720f);
         [SerializeField] private float matchWidthOrHeight = 0.5f;
+        [SerializeField] private float minimumScale = 0.75f;
 
-        private Vector2Int _lastScreenSize;
+        private CanvasScaler _scaler;
+        private RectTransform _rect;
 
         private void Awake()
         {
+            _scaler = GetComponent<CanvasScaler>();
+            _rect = GetComponent<RectTransform>();
             Apply();
         }
 
@@ -25,37 +30,38 @@ namespace UI
             Apply();
         }
 
-        private void Update()
+        private void LateUpdate()
         {
-            var size = new Vector2Int(Screen.width, Screen.height);
-            if (size != _lastScreenSize)
+            if (_rect != null && _rect.localScale.x < minimumScale * 0.5f)
             {
-                _lastScreenSize = size;
                 Apply();
             }
         }
 
-        private void Apply()
+        public void Apply()
         {
-            var scaler = GetComponent<CanvasScaler>();
-            if (scaler == null)
+            if (_scaler == null)
             {
-                return;
+                _scaler = GetComponent<CanvasScaler>();
             }
 
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-
-            var match = matchWidthOrHeight;
-            var reference = referenceResolution;
-
-            if (Screen.height > 0 && Screen.height < 700)
+            if (_rect == null)
             {
-                match = 0.75f;
+                _rect = GetComponent<RectTransform>();
             }
 
-            scaler.referenceResolution = reference;
-            scaler.matchWidthOrHeight = Mathf.Clamp01(match);
+            _scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            _scaler.referenceResolution = referenceResolution;
+            _scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            _scaler.matchWidthOrHeight = matchWidthOrHeight;
+
+            // Never keep a zero scale baked by batchmode saves.
+            if (_rect.localScale.sqrMagnitude < 0.01f)
+            {
+                _rect.localScale = Vector3.one;
+            }
+
+            Canvas.ForceUpdateCanvases();
         }
     }
 }

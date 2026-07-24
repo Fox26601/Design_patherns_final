@@ -35,6 +35,11 @@ namespace Part2_Adventure
         private void FixedUpdate()
         {
             var direction = new Vector3(_moveInput.x, 0f, _moveInput.y).normalized;
+            if (direction.sqrMagnitude < 0.01f)
+            {
+                return;
+            }
+
             _rigidbody.MovePosition(_rigidbody.position + direction * (moveSpeed * Time.fixedDeltaTime));
         }
     }
